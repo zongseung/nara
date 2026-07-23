@@ -8,3 +8,5 @@ storage/
 *.log
 *.output
 .DS_Store
+*.parquet
+*.duckdb
