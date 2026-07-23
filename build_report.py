@@ -42,6 +42,20 @@ CENTER = Alignment(horizontal="center", vertical="center", wrap_text=True)
 BOLD = Font(bold=True)
 
 
+LONG_COLS = ["업체", "세부품명", "규격", "재질", "용도", "단가", "계약구분", "모델", "식별번호"]
+
+
+def long_xlsx(rows, path_or_buf):
+    """검색결과(matcher.search 형식)를 1행=1경쟁사 롱포맷 엑셀로 저장. (웹앱·CLI 공용)"""
+    from openpyxl import Workbook
+    wb = Workbook(); ws = wb.active; ws.title = "경쟁사목록"
+    ws.append(LONG_COLS)
+    for r in rows:
+        ws.append([r.get(c) for c in LONG_COLS])
+    wb.save(path_or_buf)
+    return path_or_buf
+
+
 def _fmt(our, key):
     """우리 품목 dict → 구분 라벨에 해당하는 표시값."""
     if key == "물품식별번호":
@@ -104,12 +118,30 @@ def _add_image(ws, r, col, url, session, tmpdir):
 
 def build(our_items, out_path, top_n=3, our_company=OUR_COMPANY,
           exclude_company=None, max_pool=200, exact_price=False):
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "가격비교표"
+    wb = Workbook(); ws = wb.active; ws.title = "가격비교표"
+    session = requests.Session(); tmpdir = tempfile.mkdtemp()
+    _render(ws, our_items, our_company, top_n, exclude_company, max_pool, exact_price, session, tmpdir)
+    wb.save(out_path)
+    return out_path
+
+
+def _short(name):
+    return name.replace("주식회사", "").replace("(주)", "").strip()
+
+
+def build_multi(companies, out_path, top_n=3, max_pool=200, exact_price=True):
+    """{업체명: [our_item...]} → 업체별 시트 하나씩. 각 시트는 자기 업체 제외 매칭."""
+    wb = Workbook(); wb.remove(wb.active)
+    session = requests.Session(); tmpdir = tempfile.mkdtemp()
+    for name, items in companies.items():
+        ws = wb.create_sheet(name[:31])
+        _render(ws, items, name, top_n, _short(name), max_pool, exact_price, session, tmpdir)
+    wb.save(out_path)
+    return out_path
+
+
+def _render(ws, our_items, our_company, top_n, exclude_company, max_pool, exact_price, session, tmpdir):
     ncol = 3 + 1 + top_n                      # 연번/품명/구분 + 우리 + 후보N
-    session = requests.Session()
-    tmpdir = tempfile.mkdtemp()
 
     # 제목/업체명
     ws.merge_cells(start_row=1, end_row=1, start_column=1, end_column=ncol)
@@ -122,9 +154,8 @@ def build(our_items, out_path, top_n=3, our_company=OUR_COMPANY,
         cands = matcher.find_candidates(our, keyword=our.get("keyword"),
                                         top_n=top_n, max_pool=max_pool, exact_price=exact_price,
                                         exclude_company=exclude_company, session=session)
-        print(f"[{i}/{len(our_items)}] {our.get('모델') or our.get('품명')} "
-              f"({our.get('가격') or 0:,}) → 후보 {len(cands)}개: "
-              + ", ".join(f"{c['업체']}({c['점수']:.2f})" for c in cands))
+        print(f"[{our_company} {i}/{len(our_items)}] {our.get('모델') or our.get('품명')} "
+              f"({our.get('가격') or 0:,}) → 후보 {len(cands)}개")
 
         # 블록 헤더 (연번/품명/구분/회사명들)
         _put(ws, r, 1, "연번", HEADER_FILL, bold=True)
@@ -168,9 +199,6 @@ def build(our_items, out_path, top_n=3, our_company=OUR_COMPANY,
     ws.column_dimensions["C"].width = 14
     for col in range(4, ncol + 1):
         ws.column_dimensions[get_column_letter(col)].width = 20
-
-    wb.save(out_path)
-    return out_path
 
 
 def main():

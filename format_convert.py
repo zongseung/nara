@@ -70,6 +70,38 @@ def read_rows(sh):
     return out
 
 
+def read_items(in_path):
+    """비교 매칭용: {업체: [{품명,규격,재질,용도,가격,모델,식별번호}]}. .xls 전용 컬럼 사용."""
+    wb = xlrd.open_workbook(in_path)
+    result = {}
+    for name in wb.sheet_names():
+        sh = wb.sheet_by_name(name)
+        hr, col = _find_header(sh)
+        gw, gh, pi = (col.get("(대표)표지크기(가로)"), col.get("(대표)표지크기(세로)"),
+                      col.get("희망가(부가세포함)"))
+        items = []
+        for r in range(hr + 1, sh.nrows):
+            spec = str(sh.cell_value(r, col["한글품명"])).strip()
+            if not spec:
+                continue
+
+            def cell(cn):
+                i = col.get(cn)
+                return str(sh.cell_value(r, i)).strip() if i is not None else ""
+
+            w = _to_int(sh.cell_value(r, gw)) if gw is not None else None
+            h = _to_int(sh.cell_value(r, gh)) if gh is not None else None
+            items.append({
+                "품명": spec.split(",")[0].strip() or "품목",
+                "규격": (w, h) if isinstance(w, int) and isinstance(h, int) else None,
+                "재질": cell("재질"), "용도": cell("(대표)용도"), "모델": cell("모델명"),
+                "가격": _to_int(sh.cell_value(r, pi)) if pi is not None else 0,
+                "식별번호": _clean_id(sh.cell_value(r, col["물품식별번호"])),
+            })
+        result[name] = items
+    return result
+
+
 def _write_sheet(ws, company, rows, days, qty):
     cat = rows[0][1] if rows else "품목"
     ws.merge_cells("A1:F1")
