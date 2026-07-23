@@ -15,19 +15,28 @@ import re
 import requests
 import g2b_client as g2b
 
-MATERIALS = ["스테인리스", "알루미늄", "아크릴", "포맥스", "동판", "황동",
-             "목재", "플라스틱", "금속", "철판", "철"]
-WEIGHTS = {"재질": 0.35, "규격": 0.25, "용도": 0.25, "가격": 0.15}
+# 재질 정규화: 세부 표기(적삼목/스텐/알미늄 등)를 대분류로 묶음 (재질이 1순위라 매칭 견고성 중요)
+_MAT_SYNONYMS = {
+    "스테인리스": ["스테인리스", "스테인레스", "스텐", "sus", "sts"],
+    "목재": ["목재", "나무", "원목", "적삼목", "낙엽송", "삼나무", "방부목", "미송", "합판", "집성목", "레드파인", "홍송", "루버"],
+    "알루미늄": ["알루미늄", "알미늄", "알류미늄"],
+    "아크릴": ["아크릴"],
+    "포맥스": ["포맥스", "폼보드"],
+    "동판": ["동판", "구리", "황동", "브론즈"],
+    "플라스틱": ["플라스틱", "abs", "pvc"],
+    "철": ["철판", "스틸", "steel", "강판", "아연도", "철"],
+}
+# 재질이 절대 1순위(동일 재질이 항상 상위) · 규격은 비슷하면 OK(느슨·저비중) · 가격은 동일단가 하드필터
+WEIGHTS = {"재질": 0.55, "용도": 0.20, "규격": 0.10, "가격": 0.15}
+SPEC_TOL = 0.35   # 규격 상대차 ±35% 이내면 '비슷'으로 보고 만점
 
 
 def norm_material(s):
-    """재질 문자열 정규화. '스테인리스강'/'SUS' 등 → '스테인리스'."""
-    s = s or ""
-    if "스테인" in s or "SUS" in s.upper():
-        return "스테인리스"
-    for m in MATERIALS:
-        if m in s:
-            return m
+    """세부 재질 표기 → 대분류. (적삼목→목재, 스텐/SUS→스테인리스 등)"""
+    s = (s or "").lower()
+    for cat, syns in _MAT_SYNONYMS.items():
+        if any(syn in s for syn in syns):
+            return cat
     return ""
 
 
@@ -76,13 +85,16 @@ def extract(raw):
 def score(our, cand):
     """(총점, 항목별점수). our/cand 모두 extract 형식(우리 품목은 손으로 채운 dict)."""
     p = {}
-    p["재질"] = 1.0 if our.get("재질") and our["재질"] == cand.get("재질") else 0.0
+    # 재질: 정규화 후 동일 여부 (양쪽 다 norm_material). 1순위라 이게 순위를 지배.
+    our_mat = norm_material(our.get("재질"))
+    p["재질"] = 1.0 if our_mat and our_mat == cand.get("재질") else 0.0
+    # 규격: 비슷하기만 하면 됨 — ±SPEC_TOL 이내는 만점, 그 밖은 완만히 감점
     ov, cv = our.get("규격"), cand.get("규격")
     if ov and cv and ov[0] and ov[1]:
         d = (abs(ov[0] - cv[0]) / ov[0] + abs(ov[1] - cv[1]) / ov[1]) / 2
-        p["규격"] = max(0.0, 1 - d)
+        p["규격"] = 1.0 if d <= SPEC_TOL else max(0.0, 1 - (d - SPEC_TOL))
     else:
-        p["규격"] = 0.5
+        p["규격"] = 0.7
     p["용도"] = difflib.SequenceMatcher(None, our.get("용도", ""), cand.get("용도", "")).ratio()
     if our.get("가격"):
         p["가격"] = max(0.0, 1 - abs(our["가격"] - cand["가격"]) / our["가격"])
