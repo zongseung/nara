@@ -1,17 +1,9 @@
-# 크롤 / 매칭 / 엑셀 (코어)
+# 크롤 / 매칭 / 엑셀
 requests
 openpyxl
-pillow
+pillow           # 비교표 이미지 임베드
+xlrd             # 품목등록결과 .xls 읽기
 
-# FastAPI /match API 계층
-fastapi
-uvicorn
-httpx
-sqlalchemy
-greenlet
-aiomysql      # 운영(MySQL)
-aiosqlite     # 로컬 데모(SQLite)
-
-# MCP 서버 (선택)
-mcp
-xlrd            # 구형 .xls(품목등록결과) 읽기
+# 전체 카탈로그 덤프 → Parquet (선택)
+pyarrow
+duckdb

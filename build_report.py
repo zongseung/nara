@@ -42,20 +42,6 @@ CENTER = Alignment(horizontal="center", vertical="center", wrap_text=True)
 BOLD = Font(bold=True)
 
 
-LONG_COLS = ["업체", "세부품명", "규격", "재질", "용도", "단가", "계약구분", "모델", "식별번호"]
-
-
-def long_xlsx(rows, path_or_buf):
-    """검색결과(matcher.search 형식)를 1행=1경쟁사 롱포맷 엑셀로 저장. (웹앱·CLI 공용)"""
-    from openpyxl import Workbook
-    wb = Workbook(); ws = wb.active; ws.title = "경쟁사목록"
-    ws.append(LONG_COLS)
-    for r in rows:
-        ws.append([r.get(c) for c in LONG_COLS])
-    wb.save(path_or_buf)
-    return path_or_buf
-
-
 def _fmt(our, key):
     """우리 품목 dict → 구분 라벨에 해당하는 표시값."""
     if key == "물품식별번호":

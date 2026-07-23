@@ -10,3 +10,4 @@ storage/
 .DS_Store
 *.parquet
 *.duckdb
+*.xls
