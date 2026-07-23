@@ -15,8 +15,7 @@ import g2b_client as g2b
 import matcher
 import build_report
 
-COMPANY = "주식회사 지피코리아"
-SHORT = "지피코리아"
+DEFAULT_COMPANY = "주식회사 지피코리아"
 
 
 def to_our(raw):
@@ -28,21 +27,26 @@ def to_our(raw):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default="지피코리아_비교표.xlsx")
+    ap.add_argument("--company", default=DEFAULT_COMPANY, help="대상 업체명(나라장터 등록명)")
+    ap.add_argument("--out", default=None, help="출력 xlsx (기본: <업체>_비교표.xlsx)")
     ap.add_argument("--top", type=int, default=3)
     ap.add_argument("--limit", type=int, default=0)   # 0 = 전체
     ap.add_argument("--band", action="store_true", help="동일단가 대신 ±50%% 가격대 매칭")
     args = ap.parse_args()
 
+    company = args.company
+    short = company.replace("주식회사", "").replace("(주)", "").strip()  # 자기제외/파일명용
+    out = args.out or f"{short}_비교표.xlsx"
+
     s = requests.Session()
-    print(f"{SHORT} 카탈로그 수집 중...")
-    raws = g2b.company_catalog(COMPANY, session=s, max_items=args.limit or None)
+    print(f"{short} 카탈로그 수집 중...")
+    raws = g2b.company_catalog(company, session=s, max_items=args.limit or None)
     ours = [to_our(r) for r in raws]
     print(f"{len(ours)}개 품목 → 배치 매칭 + 비교표 생성 (자기 업체 제외)")
 
-    build_report.build(ours, args.out, top_n=args.top, our_company=COMPANY,
-                       exclude_company=SHORT, exact_price=not args.band)
-    print("저장:", args.out)
+    build_report.build(ours, out, top_n=args.top, our_company=company,
+                       exclude_company=short, exact_price=not args.band)
+    print("저장:", out)
 
 
 if __name__ == "__main__":
