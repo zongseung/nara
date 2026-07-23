@@ -111,7 +111,7 @@ def _match_one(our, top_n, max_pool, exact_price, excl, fallback_band):
 
 
 def build(our_items, out_path, top_n=3, our_company=OUR_COMPANY, exclude_companies=None,
-          max_pool=200, exact_price=False, fallback_band=0.0):
+          max_pool=500, exact_price=False, fallback_band=0.0):
     excl = exclude_companies if exclude_companies is not None else [our_company]
     pairs = [_match_one(it, top_n, max_pool, exact_price, excl, fallback_band) for it in our_items]
     wb = Workbook(); ws = wb.active; ws.title = "가격비교표"
@@ -121,7 +121,7 @@ def build(our_items, out_path, top_n=3, our_company=OUR_COMPANY, exclude_compani
     return out_path
 
 
-def build_multi(companies, out_path, top_n=3, max_pool=200, exact_price=True,
+def build_multi(companies, out_path, top_n=3, max_pool=500, exact_price=True,
                 exclude_companies=None, fallback_band=0.0, workers=8):
     """{업체명: [our_item...]} → 업체별 시트. 동시(ThreadPool) 매칭 후 렌더. 기본 계열사 상호 제외."""
     excl = exclude_companies if exclude_companies is not None else list(companies)
