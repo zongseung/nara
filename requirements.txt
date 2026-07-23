@@ -1,0 +1,16 @@
+# 크롤 / 매칭 / 엑셀 (코어)
+requests
+openpyxl
+pillow
+
+# FastAPI /match API 계층
+fastapi
+uvicorn
+httpx
+sqlalchemy
+greenlet
+aiomysql      # 운영(MySQL)
+aiosqlite     # 로컬 데모(SQLite)
+
+# MCP 서버 (선택)
+mcp
