@@ -121,10 +121,12 @@ def score(our, cand):
 
 
 def find_candidates(our, *, keyword=None, top_n=3, price_band=0.5, exact_price=False,
-                    max_pool=500, dedupe_company=True, exclude_companies=None, session=None):
+                    max_pool=500, dedupe_company=True, exclude_companies=None,
+                    fallback_band=0.0, session=None):
     """우리 품목 our에 대한 유사 후보 top_n. 키워드 + 가격 필터로 풀 수집 후 유사도 순위.
     exact_price=True: 단가가 '정확히 동일'한 것만(제안팀 비교표 — 같은 단가에서 규격/품질로 경쟁).
     exact_price=False: ±price_band 가격대.
+    fallback_band>0: 동일단가 후보가 0이면 ±fallback_band 가격대로 재시도(근사, 각 후보에 근사=True).
     exclude_companies: 제외할 업체명 목록(정규화 exact 비교). 자기·계열사 매칭 방지."""
     kw = keyword or our.get("품명", "")
     price = _to_price(our.get("가격"))
@@ -170,4 +172,12 @@ def find_candidates(our, *, keyword=None, top_n=3, price_band=0.5, exact_price=F
         top.append(c)
         if len(top) >= top_n:
             break
+
+    if not top and use_exact and fallback_band > 0:      # 동일단가 후보 없음 → 근사(가격대) 폴백
+        approx = find_candidates(our, keyword=keyword, top_n=top_n, price_band=fallback_band,
+                                 exact_price=False, max_pool=max_pool, dedupe_company=dedupe_company,
+                                 exclude_companies=exclude_companies, session=s)
+        for c in approx:
+            c["근사"] = True
+        return approx
     return top

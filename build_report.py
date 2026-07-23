@@ -12,6 +12,7 @@ import argparse
 import io
 import os
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 
 import requests
 from openpyxl import Workbook
@@ -102,29 +103,51 @@ def _add_image(ws, r, col, url, session, tmpdir):
         _put(ws, r, col, f"(이미지 실패)")
 
 
-def build(our_items, out_path, top_n=3, our_company=OUR_COMPANY,
-          exclude_companies=None, max_pool=200, exact_price=False):
+def _match_one(our, top_n, max_pool, exact_price, excl, fallback_band):
+    return our, matcher.find_candidates(
+        our, keyword=our.get("keyword"), top_n=top_n, max_pool=max_pool,
+        exact_price=exact_price, exclude_companies=excl, fallback_band=fallback_band)
+
+
+def build(our_items, out_path, top_n=3, our_company=OUR_COMPANY, exclude_companies=None,
+          max_pool=200, exact_price=False, fallback_band=0.0):
     excl = exclude_companies if exclude_companies is not None else [our_company]
+    pairs = [_match_one(it, top_n, max_pool, exact_price, excl, fallback_band) for it in our_items]
     wb = Workbook(); ws = wb.active; ws.title = "가격비교표"
     session = requests.Session(); tmpdir = tempfile.mkdtemp()
-    _render(ws, our_items, our_company, top_n, excl, max_pool, exact_price, session, tmpdir)
+    _render_pairs(ws, our_company, pairs, top_n, session, tmpdir)
     wb.save(out_path)
     return out_path
 
 
-def build_multi(companies, out_path, top_n=3, max_pool=200, exact_price=True, exclude_companies=None):
-    """{업체명: [our_item...]} → 업체별 시트 하나씩. 기본적으로 입력 5개 업체(계열사)를 서로 제외."""
+def build_multi(companies, out_path, top_n=3, max_pool=200, exact_price=True,
+                exclude_companies=None, fallback_band=0.0, workers=8):
+    """{업체명: [our_item...]} → 업체별 시트. 동시(ThreadPool) 매칭 후 렌더. 기본 계열사 상호 제외."""
     excl = exclude_companies if exclude_companies is not None else list(companies)
+    tasks = [(name, i, it) for name, items in companies.items() for i, it in enumerate(items)]
+
+    def work(t):
+        name, i, it = t
+        _, cands = _match_one(it, top_n, max_pool, exact_price, excl, fallback_band)
+        mark = " (근사)" if cands and cands[0].get("근사") else ""
+        print(f"[{name}] {it.get('모델') or it.get('품명')} ({it.get('가격') or 0:,}) → 후보 {len(cands)}개{mark}")
+        return name, i, it, cands
+
+    results = {}
+    with ThreadPoolExecutor(max_workers=workers) as ex:   # 품목 단위 동시 매칭
+        for name, i, it, cands in ex.map(work, tasks):
+            results.setdefault(name, {})[i] = (it, cands)
+
     wb = Workbook(); wb.remove(wb.active)
     session = requests.Session(); tmpdir = tempfile.mkdtemp()
     for name, items in companies.items():
         ws = wb.create_sheet(name[:31])
-        _render(ws, items, name, top_n, excl, max_pool, exact_price, session, tmpdir)
+        _render_pairs(ws, name, [results[name][i] for i in range(len(items))], top_n, session, tmpdir)
     wb.save(out_path)
     return out_path
 
 
-def _render(ws, our_items, our_company, top_n, exclude_companies, max_pool, exact_price, session, tmpdir):
+def _render_pairs(ws, our_company, pairs, top_n, session, tmpdir):
     ncol = 3 + 1 + top_n                      # 연번/품명/구분 + 우리 + 후보N
 
     # 제목/업체명
@@ -134,20 +157,14 @@ def _render(ws, our_items, our_company, top_n, exclude_companies, max_pool, exac
     _put(ws, 2, 1, f"○ 업체명 : {our_company}")
 
     r = 3
-    for i, our in enumerate(our_items, 1):
-        cands = matcher.find_candidates(our, keyword=our.get("keyword"),
-                                        top_n=top_n, max_pool=max_pool, exact_price=exact_price,
-                                        exclude_companies=exclude_companies, session=session)
-        print(f"[{our_company} {i}/{len(our_items)}] {our.get('모델') or our.get('품명')} "
-              f"({our.get('가격') or 0:,}) → 후보 {len(cands)}개")
-
-        # 블록 헤더 (연번/품명/구분/회사명들)
+    for i, (our, cands) in enumerate(pairs, 1):
+        # 블록 헤더 (연번/품명/구분/회사명들). band 폴백 후보는 (근사) 표기.
         _put(ws, r, 1, "연번", HEADER_FILL, bold=True)
         _put(ws, r, 2, "품 명", HEADER_FILL, bold=True)
         _put(ws, r, 3, "구분", HEADER_FILL, bold=True)
         _put(ws, r, 4, our_company, OUR_FILL, bold=True)
         for j, c in enumerate(cands):
-            _put(ws, r, 5 + j, c["업체"], HEADER_FILL, bold=True)
+            _put(ws, r, 5 + j, c["업체"] + (" (근사)" if c.get("근사") else ""), HEADER_FILL, bold=True)
         for j in range(len(cands), top_n):
             _put(ws, r, 5 + j, "", HEADER_FILL)
 
