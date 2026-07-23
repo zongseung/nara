@@ -97,16 +97,30 @@ def _write_sheet(ws, company, rows, days, qty):
         ws.column_dimensions[chr(64 + i)].width = w
 
 
-def convert(in_path, out_path, days=40, qty=5):
+def read_all(in_path):
     wb_in = xlrd.open_workbook(in_path)
+    return {name: read_rows(wb_in.sheet_by_name(name)) for name in wb_in.sheet_names()}
+
+
+def to_markdown(rows, days, qty, max_spec=48):
+    """행 목록 → 마크다운 표 문자열. 규격이 길면 잘라서 표시."""
+    cols = ["식별번호", "품명", "규격", "납품일수", "공급예정수량", "희망가(부가세포함)"]
+    md = ["| " + " | ".join(cols) + " |", "|" + "|".join([":--"] * len(cols)) + "|"]
+    for idnf, pumnm, spec, _, _, price in rows:
+        s = str(spec).replace("|", "/")
+        if len(s) > max_spec:
+            s = s[:max_spec - 1] + "…"
+        pr = f"{price:,}" if isinstance(price, int) else price
+        md.append(f"| {idnf or '-'} | {pumnm} | {s} | {days} | {qty} | {pr} |")
+    return "\n".join(md)
+
+
+def write_xlsx(data, out_path, days, qty):
     wb = Workbook(); wb.remove(wb.active)
-    counts = {}
-    for name in wb_in.sheet_names():
-        rows = read_rows(wb_in.sheet_by_name(name))
-        counts[name] = len(rows)
+    for name, rows in data.items():
         _write_sheet(wb.create_sheet(name[:31]), name, rows, days, qty)
     wb.save(out_path)
-    return counts
+    return out_path
 
 
 def main():
@@ -115,12 +129,24 @@ def main():
     ap.add_argument("--out", default="협상품목리스트_분석용.xlsx")
     ap.add_argument("--days", type=int, default=40, help="납품일수 고정값")
     ap.add_argument("--qty", type=int, default=5, help="공급예정수량 고정값")
+    ap.add_argument("--rows", type=int, default=0, help="시트당 미리보기 행수(0=전체)")
+    ap.add_argument("--no-xlsx", action="store_true", help="미리보기만, 엑셀 저장 안 함")
     a = ap.parse_args()
-    counts = convert(a.input, a.out, a.days, a.qty)
-    total = sum(counts.values())
-    print(f"변환 완료 → {a.out}  (총 {total}건)")
-    for name, n in counts.items():
-        print(f"  {name}: {n}건")
+
+    data = read_all(a.input)
+    for name, rows in data.items():                       # 엑셀 전에 마크다운 표로 미리보기
+        shown = rows[:a.rows] if a.rows else rows
+        print(f"\n## {name}  ({len(rows)}건)\n")
+        print(to_markdown(shown, a.days, a.qty))
+        if a.rows and len(rows) > a.rows:
+            print(f"\n_… 외 {len(rows) - a.rows}건_")
+
+    total = sum(len(r) for r in data.values())
+    if a.no_xlsx:
+        print(f"\n미리보기 전용 (총 {total}건, 엑셀 미저장)")
+    else:
+        write_xlsx(data, a.out, a.days, a.qty)
+        print(f"\n엑셀 저장 → {a.out}  (총 {total}건)")
 
 
 if __name__ == "__main__":
