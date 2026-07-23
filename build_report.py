@@ -103,7 +103,7 @@ def _add_image(ws, r, col, url, session, tmpdir):
 
 
 def build(our_items, out_path, top_n=3, our_company=OUR_COMPANY,
-          exclude_company=None, max_pool=200):
+          exclude_company=None, max_pool=200, exact_price=False):
     wb = Workbook()
     ws = wb.active
     ws.title = "가격비교표"
@@ -120,7 +120,7 @@ def build(our_items, out_path, top_n=3, our_company=OUR_COMPANY,
     r = 3
     for i, our in enumerate(our_items, 1):
         cands = matcher.find_candidates(our, keyword=our.get("keyword"),
-                                        top_n=top_n, max_pool=max_pool,
+                                        top_n=top_n, max_pool=max_pool, exact_price=exact_price,
                                         exclude_company=exclude_company, session=session)
         print(f"[{i}/{len(our_items)}] {our.get('모델') or our.get('품명')} "
               f"({our.get('가격') or 0:,}) → 후보 {len(cands)}개: "

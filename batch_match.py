@@ -31,6 +31,7 @@ def main():
     ap.add_argument("--out", default="지피코리아_비교표.xlsx")
     ap.add_argument("--top", type=int, default=3)
     ap.add_argument("--limit", type=int, default=0)   # 0 = 전체
+    ap.add_argument("--band", action="store_true", help="동일단가 대신 ±50%% 가격대 매칭")
     args = ap.parse_args()
 
     s = requests.Session()
@@ -39,8 +40,8 @@ def main():
     ours = [to_our(r) for r in raws]
     print(f"{len(ours)}개 품목 → 배치 매칭 + 비교표 생성 (자기 업체 제외)")
 
-    build_report.build(ours, args.out, top_n=args.top,
-                       our_company=COMPANY, exclude_company=SHORT)
+    build_report.build(ours, args.out, top_n=args.top, our_company=COMPANY,
+                       exclude_company=SHORT, exact_price=not args.band)
     print("저장:", args.out)
 
 

@@ -91,14 +91,20 @@ def score(our, cand):
     return sum(WEIGHTS[k] * p[k] for k in WEIGHTS), p
 
 
-def find_candidates(our, *, keyword=None, top_n=3, price_band=0.5,
+def find_candidates(our, *, keyword=None, top_n=3, price_band=0.5, exact_price=False,
                     max_pool=500, dedupe_company=True, exclude_company=None, session=None):
-    """우리 품목 our에 대한 유사 후보 top_n. 같은 가격대(±price_band)+키워드로 풀 수집.
+    """우리 품목 our에 대한 유사 후보 top_n. 키워드 + 가격 필터로 풀 수집 후 유사도 순위.
+    exact_price=True: 단가가 '정확히 동일'한 것만(제안팀 비교표 — 같은 단가에서 규격/품질로 경쟁).
+    exact_price=False: ±price_band 가격대.
     exclude_company: 우리 업체명(부분일치)은 후보에서 제외(자기 자신 매칭 방지)."""
     kw = keyword or our.get("품명", "")
     price = our.get("가격") or 0
-    lo = int(price * (1 - price_band)) if price else ""
-    hi = int(price * (1 + price_band)) if price else ""
+    if not price:
+        lo = hi = ""
+    elif exact_price:
+        lo = hi = price                                 # 정확히 같은 단가만
+    else:
+        lo, hi = int(price * (1 - price_band)), int(price * (1 + price_band))
     s = session or requests.Session()
 
     pool, page = [], 1
