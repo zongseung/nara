@@ -14,3 +14,4 @@ aiosqlite     # 로컬 데모(SQLite)
 
 # MCP 서버 (선택)
 mcp
+xlrd            # 구형 .xls(품목등록결과) 읽기
