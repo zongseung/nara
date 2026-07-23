@@ -103,30 +103,28 @@ def _add_image(ws, r, col, url, session, tmpdir):
 
 
 def build(our_items, out_path, top_n=3, our_company=OUR_COMPANY,
-          exclude_company=None, max_pool=200, exact_price=False):
+          exclude_companies=None, max_pool=200, exact_price=False):
+    excl = exclude_companies if exclude_companies is not None else [our_company]
     wb = Workbook(); ws = wb.active; ws.title = "가격비교표"
     session = requests.Session(); tmpdir = tempfile.mkdtemp()
-    _render(ws, our_items, our_company, top_n, exclude_company, max_pool, exact_price, session, tmpdir)
+    _render(ws, our_items, our_company, top_n, excl, max_pool, exact_price, session, tmpdir)
     wb.save(out_path)
     return out_path
 
 
-def _short(name):
-    return name.replace("주식회사", "").replace("(주)", "").strip()
-
-
-def build_multi(companies, out_path, top_n=3, max_pool=200, exact_price=True):
-    """{업체명: [our_item...]} → 업체별 시트 하나씩. 각 시트는 자기 업체 제외 매칭."""
+def build_multi(companies, out_path, top_n=3, max_pool=200, exact_price=True, exclude_companies=None):
+    """{업체명: [our_item...]} → 업체별 시트 하나씩. 기본적으로 입력 5개 업체(계열사)를 서로 제외."""
+    excl = exclude_companies if exclude_companies is not None else list(companies)
     wb = Workbook(); wb.remove(wb.active)
     session = requests.Session(); tmpdir = tempfile.mkdtemp()
     for name, items in companies.items():
         ws = wb.create_sheet(name[:31])
-        _render(ws, items, name, top_n, _short(name), max_pool, exact_price, session, tmpdir)
+        _render(ws, items, name, top_n, excl, max_pool, exact_price, session, tmpdir)
     wb.save(out_path)
     return out_path
 
 
-def _render(ws, our_items, our_company, top_n, exclude_company, max_pool, exact_price, session, tmpdir):
+def _render(ws, our_items, our_company, top_n, exclude_companies, max_pool, exact_price, session, tmpdir):
     ncol = 3 + 1 + top_n                      # 연번/품명/구분 + 우리 + 후보N
 
     # 제목/업체명
@@ -139,7 +137,7 @@ def _render(ws, our_items, our_company, top_n, exclude_company, max_pool, exact_
     for i, our in enumerate(our_items, 1):
         cands = matcher.find_candidates(our, keyword=our.get("keyword"),
                                         top_n=top_n, max_pool=max_pool, exact_price=exact_price,
-                                        exclude_company=exclude_company, session=session)
+                                        exclude_companies=exclude_companies, session=session)
         print(f"[{our_company} {i}/{len(our_items)}] {our.get('모델') or our.get('품명')} "
               f"({our.get('가격') or 0:,}) → 후보 {len(cands)}개")
 

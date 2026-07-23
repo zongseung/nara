@@ -25,9 +25,12 @@ def main():
     if a.limit:
         companies = {k: v[:a.limit] for k, v in companies.items()}
     total = sum(len(v) for v in companies.values())
-    print(f"{len(companies)}개 업체 / {total}개 품목 → 동일단가 경쟁사 매칭 (자기 업체 제외)")
+    print(f"{len(companies)}개 업체 / {total}개 품목 → 동일단가 경쟁사 매칭 "
+          f"(입력 {len(companies)}개사 = 계열사 상호 제외)")
 
-    build_report.build_multi(companies, a.out, top_n=a.top, exact_price=True)
+    # 입력 파일의 모든 업체(계열사)를 서로 경쟁 풀에서 제외
+    build_report.build_multi(companies, a.out, top_n=a.top, exact_price=True,
+                             exclude_companies=list(companies))
     print("저장:", a.out)
 
 

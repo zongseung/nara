@@ -21,11 +21,30 @@ _MAT_SYNONYMS = {
     "목재": ["목재", "나무", "원목", "적삼목", "낙엽송", "삼나무", "방부목", "미송", "합판", "집성목", "레드파인", "홍송", "루버"],
     "알루미늄": ["알루미늄", "알미늄", "알류미늄"],
     "아크릴": ["아크릴"],
+    "강화유리": ["강화유리", "유리"],
+    "갈바": ["갈바", "갈바늄", "갈바륨"],
     "포맥스": ["포맥스", "폼보드"],
     "동판": ["동판", "구리", "황동", "브론즈"],
     "플라스틱": ["플라스틱", "abs", "pvc"],
-    "철": ["철판", "스틸", "steel", "강판", "아연도", "철"],
+    "철": ["철판", "스틸", "steel", "강판", "강재", "아연도", "철"],  # 압연강재/내후성강재 포함
 }
+
+
+def _to_price(v):
+    """단가 안전 파싱 → 정수. 이상값(NaN·문자·None)은 0."""
+    try:
+        n = int(float(v))
+        return n if n >= 0 else 0
+    except (TypeError, ValueError):
+        return 0
+
+
+def _norm_company(name):
+    """업체명 정규화: 법인격·공백 제거 후 소문자. exact 집합 비교용(substring 오제외 방지)."""
+    s = str(name or "")
+    for t in ("주식회사", "(주)", "㈜", "유한회사", "(유)", "(재)", "(사)"):
+        s = s.replace(t, "")
+    return "".join(s.split()).lower()
 # 재질이 절대 1순위(동일 재질이 항상 상위) · 규격은 비슷하면 OK(느슨·저비중) · 가격은 동일단가 하드필터
 WEIGHTS = {"재질": 0.55, "용도": 0.20, "규격": 0.10, "가격": 0.15}
 SPEC_TOL = 0.35   # 규격 상대차 ±35% 이내면 '비슷'으로 보고 만점
@@ -65,7 +84,7 @@ def extract(raw):
     attrs = raw.get("pdctAtrbCdDtlNm", "") or ""
     name = html.unescape(raw.get("itemIdnfNm", "") or "")
     return {
-        "업체": raw.get("mnftrEtpsNm") or raw.get("ctentUntyGrpNm"),
+        "업체": html.unescape(raw.get("mnftrEtpsNm") or raw.get("ctentUntyGrpNm") or ""),
         "식별번호": raw.get("itemIdnfNo"),
         "품명": name.split(",")[0].strip() if name else "",   # itemIdnfNm 첫 토큰(안내판/간판)
         "세부품명": raw.get("dtlsPrnm"),
@@ -74,7 +93,7 @@ def extract(raw):
         "규격": parse_dims(attrs) or parse_dims(name),
         "재질": norm_material(attrs + " " + name),
         "용도": parse_use(attrs),
-        "가격": int(float(raw.get("ctrtUprc") or 0)),
+        "가격": _to_price(raw.get("ctrtUprc")),
         "모델": _model(name),
         "imgSrc": raw.get("imgSrc"),
         "계약구분": raw.get("shopCtrtTyNm"),
@@ -85,39 +104,39 @@ def extract(raw):
 def score(our, cand):
     """(총점, 항목별점수). our/cand 모두 extract 형식(우리 품목은 손으로 채운 dict)."""
     p = {}
-    # 재질: 정규화 후 동일 여부 (양쪽 다 norm_material). 1순위라 이게 순위를 지배.
-    our_mat = norm_material(our.get("재질"))
-    p["재질"] = 1.0 if our_mat and our_mat == cand.get("재질") else 0.0
-    # 규격: 비슷하기만 하면 됨 — ±SPEC_TOL 이내는 만점, 그 밖은 완만히 감점
+    # 재질: 양쪽 다 norm_material 로 정규화 후 동일 여부 (1순위 — 순위를 지배).
+    our_mat, cand_mat = norm_material(our.get("재질")), norm_material(cand.get("재질"))
+    p["재질"] = 1.0 if our_mat and our_mat == cand_mat else 0.0
+    # 규격: 비슷하기만 하면 됨 — 두 변 각각의 상대차 중 큰 쪽(max)이 ±SPEC_TOL 이내면 만점.
     ov, cv = our.get("규격"), cand.get("규격")
     if ov and cv and ov[0] and ov[1]:
-        d = (abs(ov[0] - cv[0]) / ov[0] + abs(ov[1] - cv[1]) / ov[1]) / 2
+        d = max(abs(ov[0] - cv[0]) / ov[0], abs(ov[1] - cv[1]) / ov[1])
         p["규격"] = 1.0 if d <= SPEC_TOL else max(0.0, 1 - (d - SPEC_TOL))
     else:
         p["규격"] = 0.7
     p["용도"] = difflib.SequenceMatcher(None, our.get("용도", ""), cand.get("용도", "")).ratio()
-    if our.get("가격"):
-        p["가격"] = max(0.0, 1 - abs(our["가격"] - cand["가격"]) / our["가격"])
-    else:
-        p["가격"] = 0.5
+    op, cp = _to_price(our.get("가격")), _to_price(cand.get("가격"))
+    p["가격"] = max(0.0, 1 - abs(op - cp) / op) if op else 0.5
     return sum(WEIGHTS[k] * p[k] for k in WEIGHTS), p
 
 
 def find_candidates(our, *, keyword=None, top_n=3, price_band=0.5, exact_price=False,
-                    max_pool=500, dedupe_company=True, exclude_company=None, session=None):
+                    max_pool=500, dedupe_company=True, exclude_companies=None, session=None):
     """우리 품목 our에 대한 유사 후보 top_n. 키워드 + 가격 필터로 풀 수집 후 유사도 순위.
     exact_price=True: 단가가 '정확히 동일'한 것만(제안팀 비교표 — 같은 단가에서 규격/품질로 경쟁).
     exact_price=False: ±price_band 가격대.
-    exclude_company: 우리 업체명(부분일치)은 후보에서 제외(자기 자신 매칭 방지)."""
+    exclude_companies: 제외할 업체명 목록(정규화 exact 비교). 자기·계열사 매칭 방지."""
     kw = keyword or our.get("품명", "")
-    price = our.get("가격") or 0
-    if not price:
-        lo = hi = ""
-    elif exact_price:
+    price = _to_price(our.get("가격"))
+    use_exact = exact_price and price > 0
+    if use_exact:
         lo = hi = price                                 # 정확히 같은 단가만
-    else:
+    elif price:
         lo, hi = int(price * (1 - price_band)), int(price * (1 + price_band))
+    else:
+        lo = hi = ""
     s = session or requests.Session()
+    excluded = {_norm_company(n) for n in (exclude_companies or [])}
 
     pool, page = [], 1
     while len(pool) < max_pool:
@@ -132,17 +151,22 @@ def find_candidates(our, *, keyword=None, top_n=3, price_band=0.5, exact_price=F
     scored = []
     for r in pool:
         c = extract(r)
+        if use_exact and c["가격"] != price:            # API 신뢰 안 하고 로컬에서도 동일단가 강제
+            continue
         c["점수"], c["점수상세"] = score(our, c)
         scored.append(c)
     scored.sort(key=lambda x: -x["점수"])
 
     top, seen = [], set()
     for c in scored:
-        if exclude_company and c["업체"] and exclude_company in c["업체"]:
-            continue                                    # 자기 업체 제외
-        if dedupe_company and c["업체"] in seen:
+        comp = c.get("업체")
+        if not comp:
             continue
-        seen.add(c["업체"])
+        if _norm_company(comp) in excluded:             # 자기·계열사 제외 (정규화 exact)
+            continue
+        if dedupe_company and comp in seen:
+            continue
+        seen.add(comp)
         top.append(c)
         if len(top) >= top_n:
             break
