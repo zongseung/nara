@@ -60,9 +60,11 @@ POST https://shop.g2b.go.kr/gm/gms/gmsd/newShopUntySrchApi.do
 
 | 파일 | 역할 |
 |---|---|
+| **`format_convert.py`** | **품목등록결과(.xls) → 협상품목리스트 양식(.xlsx) 변환 + 마크다운 미리보기** |
+| **`compare_file.py`** | **제안업체 .xls → 각 품목 동일단가 경쟁사 매칭 → 업체별 가격비교표** |
 | `g2b_client.py` | 종합쇼핑몰 크롤 코어 — 키워드/가격구간/업체명 검색, 페이징, 필드 정리 |
-| `matcher.py` | 유사도 매칭 — 재질(0.35)·규격(0.25)·용도(0.25)·가격(0.15) 가중합 |
-| `build_report.py` | 비교표 엑셀 생성 (다품목 블록 + 이미지 임베드) |
+| `matcher.py` | 유사도 매칭 — 재질(0.35)·규격(0.25)·용도(0.25)·가격(0.15) 가중합 + 동일단가 필터 |
+| `build_report.py` | 비교표 엑셀 생성 (다품목 블록 + 이미지 임베드, 업체별 시트) |
 | `batch_match.py` | 업체 전 품목 배치 매칭 → 비교표 일괄 생성 |
 | `crawl_all.py` | 전체 카탈로그(104만) 덤프 → SQLite (가격 샤딩 + 동시요청 + 재개) |
 | `app.py` | FastAPI `/match` 엔드포인트 (MySQL/SQLite 공통) |
@@ -72,52 +74,48 @@ POST https://shop.g2b.go.kr/gm/gms/gmsd/newShopUntySrchApi.do
 | `DESIGN.md` | 아키텍처·데이터모델·API 계약 설계 문서 |
 | `test_*.py` | 파서·가격샤딩 자체검증 (네트워크 불필요) |
 
-## 설치
+## 빠른 시작 — 실제 업무 흐름
 
+제안업체 품목등록결과(`.xls`) → ① 협상품목리스트(제출 양식) + ② 가격비교표(동일단가 경쟁사).
+
+### 0) 최초 1회 세팅
 ```bash
+cd nara
 python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
+source .venv/bin/activate          # 프롬프트에 (.venv) 뜨면 성공 (Windows: .venv\Scripts\activate)
+pip install -r requirements.txt
 ```
+> 이후엔 새 터미널마다 `cd nara && source .venv/bin/activate` 만.
 
-## 사용법
-
-### 0) 동적 검색 웹앱 (추천 · 비개발자용)
-브라우저에서 키워드·계약구분·동일단가로 즉석 검색 → 경쟁사 **전량** 표시(3개 캡 없음) → 엑셀 다운로드:
+### 1) 협상품목리스트 만들기 (제출 양식)
 ```bash
-.venv/bin/python -m uvicorn webapp:app --host 0.0.0.0 --port 8000
-# 브라우저에서 http://<서버IP>:8000 접속 → 검색
+python format_convert.py "품목등록결과.xls" --out 협상품목리스트.xlsx
 ```
-사용자는 URL 하나만 받으면 됨(설치·CLI 불필요).
+- 실행하면 업체별 시트를 **마크다운 표로 미리보기** → 확인 후 `협상품목리스트.xlsx` 저장
+- 헤더명 자동인식(시트마다 컬럼 위치 달라도 OK) · 식별번호 `.0`/앞 탭 자동정리
+- 옵션: `--rows 5`(미리보기 행수) · `--no-xlsx`(미리보기만, 저장 안 함) · `--days 40 --qty 5`(고정값)
 
-### 1) 업체 전 품목 비교표 (배치)
-업체명으로 나라장터에서 전 품목을 끌어와 경쟁사 매칭 → 비교표 한 장:
+### 2) 가격비교표 만들기 (동일단가 경쟁사)
 ```bash
-.venv/bin/python batch_match.py --out 비교표.xlsx --top 3
-.venv/bin/python batch_match.py --limit 10       # 앞 10개만 빠른 확인
+python compare_file.py "품목등록결과.xls" --out 가격비교표.xlsx
 ```
+- 각 품목 → 나라장터에서 **같은 단가** 경쟁사를 찾아 유사도(규격·재질·용도) 순 top3 → 업체별 시트 + 경쟁사 이미지 임베드
+- 나라장터 **실시간 조회**라 품목 수만큼 검색(98건이면 몇 분, 진행상황 출력)
+- 옵션: `--top 3`(경쟁사 수) · `--limit 2`(업체당 품목 상한, 빠른 테스트)
 
-### 2) `/match` API 라이브 데모 (MySQL 없이)
-```bash
-.venv/bin/python demo_match.py
-# 실제 app.py의 /match 핸들러를 SQLite로 구동 → 매칭+이미지+DB 저장 확인
-```
+> 입력 `.xls`가 다른 폴더에 있으면 경로로 지정: `python compare_file.py "../품목등록결과.xls"`
+> (예: 파일이 `~/Downloads`, 코드가 `~/Downloads/nara` 면 `../` 붙임)
 
-### 3) FastAPI 운영 (MySQL)
-```bash
-mysql < schema.sql
-DB_URL="mysql+aiomysql://user:pw@host/g2b" .venv/bin/uvicorn app:app
-# POST /match { "product_id": "GK-BF02", "top_n": 3 }
-```
+## 기타 도구
 
-### 4) 전체 카탈로그 덤프 (104만 건)
-```bash
-.venv/bin/python crawl_all.py                    # shop_all.db, 약 1시간
-```
-
-### 5) 키워드 검색 MCP 서버
-```bash
-# .mcp.json 에 등록:  "g2b-shop": { "command": "python3", "args": ["/abs/server.py"] }
-```
+| 명령 | 용도 |
+|---|---|
+| `uvicorn webapp:app --host 0.0.0.0 --port 8000` | 브라우저 동적 검색(키워드·계약구분·동일단가) + 엑셀 다운로드 |
+| `python batch_match.py --company "업체명"` | 나라장터 등록 업체명으로 전 품목 비교표 |
+| `python crawl_all.py` → `python export_parquet.py` | 종합쇼핑몰 전체(104만) 덤프 → SQLite → Parquet |
+| `python demo_match.py` | `/match` API 라이브 데모(SQLite, MySQL 불필요) |
+| `uvicorn app:app` (+ `schema.sql`, `DB_URL` MySQL) | `/match` API 운영 |
+| `server.py` (`.mcp.json` 등록) | 키워드 검색 MCP 서버 |
 
 ### 검증
 ```bash
