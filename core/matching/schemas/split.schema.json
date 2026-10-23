@@ -1,0 +1,238 @@
+{
+  "$defs": {
+    "Label": {
+      "properties": {
+        "label_id": {
+          "title": "Label Id",
+          "type": "string"
+        },
+        "request_id": {
+          "title": "Request Id",
+          "type": "string"
+        },
+        "candidate_id": {
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "revision_group": {
+          "title": "Revision Group",
+          "type": "string"
+        },
+        "family_id": {
+          "title": "Family Id",
+          "type": "string"
+        },
+        "seller_id": {
+          "title": "Seller Id",
+          "type": "string"
+        },
+        "purpose": {
+          "$ref": "#/$defs/Purpose"
+        },
+        "category_id": {
+          "title": "Category Id",
+          "type": "string"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Target"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "evidence_hash": {
+          "title": "Evidence Hash",
+          "type": "string"
+        },
+        "reviewer": {
+          "title": "Reviewer",
+          "type": "string"
+        },
+        "reviewed_at": {
+          "format": "date-time",
+          "title": "Reviewed At",
+          "type": "string"
+        },
+        "trust": {
+          "$ref": "#/$defs/Trust"
+        },
+        "provenance": {
+          "title": "Provenance",
+          "type": "string"
+        },
+        "sampling_origin": {
+          "title": "Sampling Origin",
+          "type": "string"
+        },
+        "environment": {
+          "title": "Environment",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label_id",
+        "request_id",
+        "candidate_id",
+        "revision_group",
+        "family_id",
+        "seller_id",
+        "purpose",
+        "category_id",
+        "target",
+        "reason",
+        "evidence_hash",
+        "reviewer",
+        "reviewed_at",
+        "trust",
+        "provenance",
+        "sampling_origin",
+        "environment"
+      ],
+      "title": "Label",
+      "type": "object"
+    },
+    "Purpose": {
+      "enum": [
+        "exact_identity",
+        "same_price_competitor",
+        "functional_substitute"
+      ],
+      "title": "Purpose",
+      "type": "string"
+    },
+    "Trust": {
+      "enum": [
+        "gold",
+        "weak"
+      ],
+      "title": "Trust",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "assignments": {
+      "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "string"
+          }
+        ],
+        "type": "array"
+      },
+      "title": "Assignments",
+      "type": "array"
+    },
+    "content_hash": {
+      "title": "Content Hash",
+      "type": "string"
+    },
+    "label_availability": {
+      "title": "Label Availability",
+      "type": "string"
+    },
+    "total_count": {
+      "title": "Total Count",
+      "type": "integer"
+    },
+    "unresolved_count": {
+      "title": "Unresolved Count",
+      "type": "integer"
+    },
+    "distribution": {
+      "items": {
+        "maxItems": 4,
+        "minItems": 4,
+        "prefixItems": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "string"
+          },
+          {
+            "type": "integer"
+          },
+          {
+            "type": "integer"
+          }
+        ],
+        "type": "array"
+      },
+      "title": "Distribution",
+      "type": "array"
+    },
+    "requested_ratios": {
+      "default": [
+        50,
+        15,
+        15,
+        20
+      ],
+      "maxItems": 4,
+      "minItems": 4,
+      "prefixItems": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "integer"
+        }
+      ],
+      "title": "Requested Ratios",
+      "type": "array"
+    },
+    "limitations": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Limitations",
+      "type": "array"
+    },
+    "seller_holdout": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Seller Holdout",
+      "type": "array"
+    },
+    "test_labels": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Label"
+      },
+      "title": "Test Labels",
+      "type": "array"
+    }
+  },
+  "required": [
+    "assignments",
+    "content_hash",
+    "label_availability",
+    "total_count",
+    "unresolved_count",
+    "distribution"
+  ],
+  "title": "SplitManifest",
+  "type": "object"
+}

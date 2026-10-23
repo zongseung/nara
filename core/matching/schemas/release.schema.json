@@ -1,0 +1,294 @@
+{
+  "$defs": {
+    "Certificate": {
+      "additionalProperties": false,
+      "properties": {
+        "release_hash": {
+          "title": "Release Hash",
+          "type": "string"
+        },
+        "evaluation_hash": {
+          "title": "Evaluation Hash",
+          "type": "string"
+        },
+        "label_hash": {
+          "title": "Label Hash",
+          "type": "string"
+        },
+        "split_hash": {
+          "title": "Split Hash",
+          "type": "string"
+        },
+        "certified_routes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Certified Routes",
+          "type": "array"
+        },
+        "positive_count": {
+          "minimum": 1,
+          "title": "Positive Count",
+          "type": "integer"
+        },
+        "positive_lower": {
+          "maximum": 1,
+          "minimum": 0.995,
+          "title": "Positive Lower",
+          "type": "number"
+        },
+        "no_match_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "No Match Count",
+          "type": "integer"
+        },
+        "no_match_lower": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0.995,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "No Match Lower"
+        },
+        "environment": {
+          "const": "production",
+          "default": "production",
+          "title": "Environment",
+          "type": "string"
+        }
+      },
+      "required": [
+        "release_hash",
+        "evaluation_hash",
+        "label_hash",
+        "split_hash",
+        "certified_routes",
+        "positive_count",
+        "positive_lower"
+      ],
+      "title": "Certificate",
+      "type": "object"
+    },
+    "DecisionConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "top_n": {
+          "default": 3,
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Top N",
+          "type": "integer"
+        },
+        "shortage": {
+          "default": "allow_fewer",
+          "enum": [
+            "allow_fewer",
+            "review"
+          ],
+          "title": "Shortage",
+          "type": "string"
+        },
+        "ranking": {
+          "default": "probability",
+          "enum": [
+            "probability",
+            "lowest_price"
+          ],
+          "title": "Ranking",
+          "type": "string"
+        },
+        "supplier_dedupe": {
+          "const": "verified_seller",
+          "default": "verified_seller",
+          "title": "Supplier Dedupe",
+          "type": "string"
+        },
+        "reuse": {
+          "default": "disabled",
+          "enum": [
+            "disabled",
+            "certified_registry"
+          ],
+          "title": "Reuse",
+          "type": "string"
+        },
+        "max_scan": {
+          "default": 50000,
+          "minimum": 1,
+          "title": "Max Scan",
+          "type": "integer"
+        },
+        "max_seconds": {
+          "default": 20,
+          "exclusiveMinimum": 0,
+          "title": "Max Seconds",
+          "type": "number"
+        },
+        "max_detail": {
+          "default": 500,
+          "minimum": 1,
+          "title": "Max Detail",
+          "type": "integer"
+        }
+      },
+      "title": "DecisionConfig",
+      "type": "object"
+    },
+    "Purpose": {
+      "enum": [
+        "exact_identity",
+        "same_price_competitor",
+        "functional_substitute"
+      ],
+      "title": "Purpose",
+      "type": "string"
+    },
+    "ReleaseManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "release_id": {
+          "title": "Release Id",
+          "type": "string"
+        },
+        "purpose": {
+          "$ref": "#/$defs/Purpose"
+        },
+        "category_id": {
+          "title": "Category Id",
+          "type": "string"
+        },
+        "policy_hash": {
+          "title": "Policy Hash",
+          "type": "string"
+        },
+        "dataset_hash": {
+          "title": "Dataset Hash",
+          "type": "string"
+        },
+        "source_normalizer_version": {
+          "title": "Source Normalizer Version",
+          "type": "string"
+        },
+        "matching_normalizer_version": {
+          "title": "Matching Normalizer Version",
+          "type": "string"
+        },
+        "environment": {
+          "default": "shadow",
+          "title": "Environment",
+          "type": "string"
+        },
+        "schema_version": {
+          "default": "matching/1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "release_id",
+        "purpose",
+        "category_id",
+        "policy_hash",
+        "dataset_hash",
+        "source_normalizer_version",
+        "matching_normalizer_version"
+      ],
+      "title": "ReleaseManifest",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "manifest": {
+      "$ref": "#/$defs/ReleaseManifest"
+    },
+    "config": {
+      "$ref": "#/$defs/DecisionConfig",
+      "default": {
+        "top_n": 3,
+        "shortage": "allow_fewer",
+        "ranking": "probability",
+        "supplier_dedupe": "verified_seller",
+        "reuse": "disabled",
+        "max_scan": 50000,
+        "max_seconds": 20.0,
+        "max_detail": 500
+      }
+    },
+    "threshold": {
+      "default": 1,
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Threshold",
+      "type": "number"
+    },
+    "model_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Hash"
+    },
+    "registry_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Registry Hash"
+    },
+    "feature_version": {
+      "default": "pair-features/1",
+      "title": "Feature Version",
+      "type": "string"
+    },
+    "state": {
+      "default": "draft",
+      "enum": [
+        "draft",
+        "candidate",
+        "certified",
+        "retired"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "certificate": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Certificate"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "no_match_enabled": {
+      "default": false,
+      "title": "No Match Enabled",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "manifest"
+  ],
+  "title": "Release",
+  "type": "object"
+}

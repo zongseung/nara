@@ -1,0 +1,183 @@
+{
+  "$defs": {
+    "Vocabulary": {
+      "additionalProperties": false,
+      "properties": {
+        "terms": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Terms",
+          "type": "array"
+        },
+        "idf": {
+          "items": {
+            "type": "number"
+          },
+          "title": "Idf",
+          "type": "array"
+        },
+        "version": {
+          "default": "pair-features/1",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "terms",
+        "idf"
+      ],
+      "title": "Vocabulary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "algorithm": {
+      "enum": [
+        "rules",
+        "logreg",
+        "catboost"
+      ],
+      "title": "Algorithm",
+      "type": "string"
+    },
+    "vocabulary": {
+      "$ref": "#/$defs/Vocabulary"
+    },
+    "coefficients": {
+      "default": [],
+      "items": {
+        "type": "number"
+      },
+      "title": "Coefficients",
+      "type": "array"
+    },
+    "intercept": {
+      "default": 0,
+      "title": "Intercept",
+      "type": "number"
+    },
+    "calibration_slope": {
+      "default": 1,
+      "title": "Calibration Slope",
+      "type": "number"
+    },
+    "calibration_intercept": {
+      "default": 0,
+      "title": "Calibration Intercept",
+      "type": "number"
+    },
+    "threshold": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Threshold",
+      "type": "number"
+    },
+    "dataset_hash": {
+      "title": "Dataset Hash",
+      "type": "string"
+    },
+    "split_hash": {
+      "title": "Split Hash",
+      "type": "string"
+    },
+    "runtime": {
+      "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "string"
+          }
+        ],
+        "type": "array"
+      },
+      "title": "Runtime",
+      "type": "array"
+    },
+    "train_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Train Ids",
+      "type": "array"
+    },
+    "calibration_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Calibration Ids",
+      "type": "array"
+    },
+    "validation_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Validation Ids",
+      "type": "array"
+    },
+    "binary_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Binary Hash"
+    },
+    "feature_version": {
+      "default": "pair-features/1",
+      "title": "Feature Version",
+      "type": "string"
+    },
+    "feature_names": {
+      "default": [
+        "text_similarity",
+        "category_equal",
+        "model_equal",
+        "model_conflict",
+        "identity_equal",
+        "kind_equal",
+        "missing",
+        "conflicts",
+        "numeric_distance",
+        "unit_conflict",
+        "price_relative_difference"
+      ],
+      "items": {
+        "type": "string"
+      },
+      "title": "Feature Names",
+      "type": "array"
+    },
+    "environment": {
+      "enum": [
+        "fixture",
+        "production"
+      ],
+      "title": "Environment",
+      "type": "string"
+    }
+  },
+  "required": [
+    "algorithm",
+    "vocabulary",
+    "threshold",
+    "dataset_hash",
+    "split_hash",
+    "runtime",
+    "train_ids",
+    "calibration_ids",
+    "validation_ids",
+    "environment"
+  ],
+  "title": "Artifact",
+  "type": "object"
+}

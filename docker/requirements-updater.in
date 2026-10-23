@@ -1,0 +1,4 @@
+prefect[redis]==3.9.0
+prefect-redis==0.3.0
+requests==2.34.2
+openpyxl==3.1.5

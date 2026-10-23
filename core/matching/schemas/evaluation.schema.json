@@ -1,0 +1,317 @@
+{
+  "$defs": {
+    "Cell": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "purpose": {
+          "title": "Purpose",
+          "type": "string"
+        },
+        "route": {
+          "title": "Route",
+          "type": "string"
+        },
+        "top_n": {
+          "title": "Top N",
+          "type": "integer"
+        },
+        "positive_count": {
+          "title": "Positive Count",
+          "type": "integer"
+        },
+        "positive_correct": {
+          "title": "Positive Correct",
+          "type": "integer"
+        },
+        "positive_unresolved": {
+          "title": "Positive Unresolved",
+          "type": "integer"
+        },
+        "positive_lower": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Positive Lower"
+        },
+        "no_match_count": {
+          "title": "No Match Count",
+          "type": "integer"
+        },
+        "no_match_correct": {
+          "title": "No Match Correct",
+          "type": "integer"
+        },
+        "no_match_unresolved": {
+          "title": "No Match Unresolved",
+          "type": "integer"
+        },
+        "no_match_lower": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "No Match Lower"
+        }
+      },
+      "required": [
+        "category",
+        "purpose",
+        "route",
+        "top_n",
+        "positive_count",
+        "positive_correct",
+        "positive_unresolved",
+        "positive_lower",
+        "no_match_count",
+        "no_match_correct",
+        "no_match_unresolved",
+        "no_match_lower"
+      ],
+      "title": "Cell",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "release_hash": {
+      "title": "Release Hash",
+      "type": "string"
+    },
+    "test_hash": {
+      "title": "Test Hash",
+      "type": "string"
+    },
+    "split_hash": {
+      "title": "Split Hash",
+      "type": "string"
+    },
+    "label_hash": {
+      "title": "Label Hash",
+      "type": "string"
+    },
+    "registry_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Registry Hash"
+    },
+    "total": {
+      "title": "Total",
+      "type": "integer"
+    },
+    "positive_count": {
+      "title": "Positive Count",
+      "type": "integer"
+    },
+    "no_match_count": {
+      "title": "No Match Count",
+      "type": "integer"
+    },
+    "match_coverage": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Match Coverage"
+    },
+    "auto_close_rate": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Auto Close Rate"
+    },
+    "status_counts": {
+      "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "integer"
+          }
+        ],
+        "type": "array"
+      },
+      "title": "Status Counts",
+      "type": "array"
+    },
+    "incomplete_retrieval_count": {
+      "title": "Incomplete Retrieval Count",
+      "type": "integer"
+    },
+    "unknown_candidate_count": {
+      "title": "Unknown Candidate Count",
+      "type": "integer"
+    },
+    "recall_at_500": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Recall At 500"
+    },
+    "pair_precision": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Pair Precision"
+    },
+    "pair_recall": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Pair Recall"
+    },
+    "bundle_precision": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Bundle Precision"
+    },
+    "latency_p50_seconds": {
+      "title": "Latency P50 Seconds",
+      "type": "number"
+    },
+    "latency_p95_seconds": {
+      "title": "Latency P95 Seconds",
+      "type": "number"
+    },
+    "peak_rss_bytes": {
+      "title": "Peak Rss Bytes",
+      "type": "integer"
+    },
+    "throughput_per_minute": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Throughput Per Minute"
+    },
+    "cells": {
+      "items": {
+        "$ref": "#/$defs/Cell"
+      },
+      "title": "Cells",
+      "type": "array"
+    },
+    "eligibility": {
+      "enum": [
+        "eligible",
+        "INSUFFICIENT_EVALUATION_DATA"
+      ],
+      "title": "Eligibility",
+      "type": "string"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Limitations",
+      "type": "array"
+    },
+    "holdouts": {
+      "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "string"
+          }
+        ],
+        "type": "array"
+      },
+      "title": "Holdouts",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "matching-evaluation/1",
+      "default": "matching-evaluation/1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "release_hash",
+    "test_hash",
+    "split_hash",
+    "label_hash",
+    "registry_hash",
+    "total",
+    "positive_count",
+    "no_match_count",
+    "match_coverage",
+    "auto_close_rate",
+    "status_counts",
+    "incomplete_retrieval_count",
+    "unknown_candidate_count",
+    "recall_at_500",
+    "pair_precision",
+    "pair_recall",
+    "bundle_precision",
+    "latency_p50_seconds",
+    "latency_p95_seconds",
+    "peak_rss_bytes",
+    "throughput_per_minute",
+    "cells",
+    "eligibility",
+    "limitations",
+    "holdouts"
+  ],
+  "title": "EvaluationReport",
+  "type": "object"
+}

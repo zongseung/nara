@@ -1,0 +1,233 @@
+{
+  "$defs": {
+    "ReaderLocator": {
+      "additionalProperties": false,
+      "properties": {
+        "data_root": {
+          "title": "Data Root",
+          "type": "string"
+        },
+        "control": {
+          "const": "control/catalog.sqlite",
+          "title": "Control",
+          "type": "string"
+        },
+        "profile": {
+          "title": "Profile",
+          "type": "string"
+        },
+        "pin": {
+          "title": "Pin",
+          "type": "string"
+        }
+      },
+      "required": [
+        "data_root",
+        "control",
+        "profile",
+        "pin"
+      ],
+      "title": "ReaderLocator",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "manifest_schema": {
+      "const": "g2b.catalog-manifest/1",
+      "title": "Manifest Schema",
+      "type": "string"
+    },
+    "artifact_kind": {
+      "const": "updater_snapshot",
+      "title": "Artifact Kind",
+      "type": "string"
+    },
+    "environment": {
+      "enum": [
+        "fixture",
+        "production"
+      ],
+      "title": "Environment",
+      "type": "string"
+    },
+    "source_id": {
+      "title": "Source Id",
+      "type": "string"
+    },
+    "scope": {
+      "title": "Scope",
+      "type": "string"
+    },
+    "profile_hash": {
+      "title": "Profile Hash",
+      "type": "string"
+    },
+    "entity_kind": {
+      "enum": [
+        "listing",
+        "goods"
+      ],
+      "title": "Entity Kind",
+      "type": "string"
+    },
+    "source_schema_version": {
+      "title": "Source Schema Version",
+      "type": "string"
+    },
+    "source_normalizer_version": {
+      "title": "Source Normalizer Version",
+      "type": "string"
+    },
+    "catalog_generation": {
+      "minimum": 1,
+      "title": "Catalog Generation",
+      "type": "integer"
+    },
+    "publication_id": {
+      "title": "Publication Id",
+      "type": "string"
+    },
+    "source_refresh_run_id": {
+      "title": "Source Refresh Run Id",
+      "type": "string"
+    },
+    "publication_kind": {
+      "enum": [
+        "refresh",
+        "maintenance"
+      ],
+      "title": "Publication Kind",
+      "type": "string"
+    },
+    "published_at": {
+      "title": "Published At",
+      "type": "string"
+    },
+    "observed_from": {
+      "title": "Observed From",
+      "type": "string"
+    },
+    "observed_to": {
+      "title": "Observed To",
+      "type": "string"
+    },
+    "snapshot_path": {
+      "title": "Snapshot Path",
+      "type": "string"
+    },
+    "snapshot_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Snapshot Sha256",
+      "type": "string"
+    },
+    "snapshot_schema_version": {
+      "const": 1,
+      "title": "Snapshot Schema Version",
+      "type": "integer"
+    },
+    "snapshot_id": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Snapshot Id",
+      "type": "string"
+    },
+    "publication_status": {
+      "const": "published",
+      "title": "Publication Status",
+      "type": "string"
+    },
+    "storage_integrity": {
+      "const": "verified",
+      "title": "Storage Integrity",
+      "type": "string"
+    },
+    "collection_validation": {
+      "const": "reconciled_observation",
+      "title": "Collection Validation",
+      "type": "string"
+    },
+    "coverage_complete": {
+      "title": "Coverage Complete",
+      "type": "boolean"
+    },
+    "unresolved_count": {
+      "minimum": 0,
+      "title": "Unresolved Count",
+      "type": "integer"
+    },
+    "source_consistency": {
+      "const": "observation_window",
+      "title": "Source Consistency",
+      "type": "string"
+    },
+    "source_snapshot_verified": {
+      "const": false,
+      "title": "Source Snapshot Verified",
+      "type": "boolean"
+    },
+    "information_groups": {
+      "additionalProperties": {
+        "additionalProperties": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "type": "object"
+      },
+      "title": "Information Groups",
+      "type": "object"
+    },
+    "reader_locator": {
+      "$ref": "#/$defs/ReaderLocator"
+    },
+    "request_budgets": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Request Budgets",
+      "type": "object"
+    }
+  },
+  "required": [
+    "manifest_schema",
+    "artifact_kind",
+    "environment",
+    "source_id",
+    "scope",
+    "profile_hash",
+    "entity_kind",
+    "source_schema_version",
+    "source_normalizer_version",
+    "catalog_generation",
+    "publication_id",
+    "source_refresh_run_id",
+    "publication_kind",
+    "published_at",
+    "observed_from",
+    "observed_to",
+    "snapshot_path",
+    "snapshot_sha256",
+    "snapshot_schema_version",
+    "snapshot_id",
+    "publication_status",
+    "storage_integrity",
+    "collection_validation",
+    "coverage_complete",
+    "unresolved_count",
+    "source_consistency",
+    "source_snapshot_verified",
+    "information_groups",
+    "reader_locator",
+    "request_budgets"
+  ],
+  "title": "Manifest",
+  "type": "object"
+}

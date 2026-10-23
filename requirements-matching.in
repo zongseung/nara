@@ -1,0 +1,8 @@
+# Optional CPU matching runtime, separate from the legacy application.
+pydantic==2.14.1
+numpy==2.5.4
+scipy==1.18.1
+scikit-learn==1.9.1
+catboost==1.2.10
+# Preserve the installed, validated transitive date parser.
+python-dateutil==2.9.0.post0

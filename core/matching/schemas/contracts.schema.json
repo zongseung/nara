@@ -1,0 +1,1115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "AttributeEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/DecimalPayload"
+            },
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/DecimalPayload"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Unit"
+        },
+        "source_field": {
+          "title": "Source Field",
+          "type": "string"
+        },
+        "raw": {
+          "title": "Raw",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/EvidenceState"
+        },
+        "normalizer_version": {
+          "default": "matching-attributes/1",
+          "title": "Normalizer Version",
+          "type": "string"
+        },
+        "source_span": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "integer"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Span"
+        },
+        "checked_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Checked At"
+        }
+      },
+      "required": [
+        "value",
+        "unit",
+        "source_field",
+        "raw",
+        "status"
+      ],
+      "title": "AttributeEvidence",
+      "type": "object"
+    },
+    "Candidate": {
+      "additionalProperties": false,
+      "properties": {
+        "listing_key": {
+          "title": "Listing Key",
+          "type": "string"
+        },
+        "category_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Category Id"
+        },
+        "name_raw": {
+          "title": "Name Raw",
+          "type": "string"
+        },
+        "spec_raw": {
+          "default": "",
+          "title": "Spec Raw",
+          "type": "string"
+        },
+        "attributes": {
+          "default": [],
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/AttributeEvidence"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Attributes",
+          "type": "array"
+        },
+        "price": {
+          "$ref": "#/$defs/PriceBasis"
+        },
+        "goods_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Goods Id"
+        },
+        "goods_id_verified": {
+          "default": false,
+          "title": "Goods Id Verified",
+          "type": "boolean"
+        },
+        "seller_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seller Id"
+        },
+        "seller_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seller Name"
+        },
+        "manufacturer_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Manufacturer Id"
+        },
+        "manufacturer_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Manufacturer Name"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "options": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Options"
+        },
+        "item_kind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Item Kind"
+        },
+        "contract_until": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Contract Until"
+        },
+        "latest_contract": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Latest Contract"
+        },
+        "group_checked_at": {
+          "default": [],
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Group Checked At",
+          "type": "array"
+        },
+        "certificates": {
+          "default": [],
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Certificates",
+          "type": "array"
+        },
+        "snapshot_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Snapshot Id"
+        },
+        "item_version_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Item Version Id"
+        },
+        "source_normalizer_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Normalizer Version"
+        },
+        "environment": {
+          "default": "unverified",
+          "title": "Environment",
+          "type": "string"
+        },
+        "raw_fields": {
+          "default": [],
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Raw Fields",
+          "type": "array"
+        }
+      },
+      "required": [
+        "listing_key",
+        "category_id",
+        "name_raw"
+      ],
+      "title": "Candidate",
+      "type": "object"
+    },
+    "ConstraintResult": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "title": "Field",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/ConstraintStatus"
+        },
+        "reason": {
+          "$ref": "#/$defs/ReasonCode"
+        },
+        "expected": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/DecimalPayload"
+            },
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/DecimalPayload"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected"
+        },
+        "actual": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/DecimalPayload"
+            },
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/DecimalPayload"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Actual"
+        }
+      },
+      "required": [
+        "field",
+        "status",
+        "reason"
+      ],
+      "title": "ConstraintResult",
+      "type": "object"
+    },
+    "ConstraintStatus": {
+      "enum": [
+        "PASS",
+        "FAIL",
+        "UNKNOWN"
+      ],
+      "title": "ConstraintStatus",
+      "type": "string"
+    },
+    "DecimalPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "decimal": {
+          "title": "Decimal",
+          "type": "string"
+        }
+      },
+      "required": [
+        "decimal"
+      ],
+      "title": "DecimalPayload",
+      "type": "object"
+    },
+    "DecisionStatus": {
+      "enum": [
+        "auto_confirmed",
+        "auto_no_match",
+        "review_required",
+        "invalid_input",
+        "processing_failed"
+      ],
+      "title": "DecisionStatus",
+      "type": "string"
+    },
+    "EvidenceState": {
+      "enum": [
+        "known",
+        "missing",
+        "ambiguous",
+        "conflicting"
+      ],
+      "title": "EvidenceState",
+      "type": "string"
+    },
+    "InputItem": {
+      "additionalProperties": false,
+      "properties": {
+        "input_row_id": {
+          "title": "Input Row Id",
+          "type": "string"
+        },
+        "purpose": {
+          "$ref": "#/$defs/Purpose"
+        },
+        "category_id": {
+          "title": "Category Id",
+          "type": "string"
+        },
+        "name_raw": {
+          "title": "Name Raw",
+          "type": "string"
+        },
+        "spec_raw": {
+          "title": "Spec Raw",
+          "type": "string"
+        },
+        "attributes": {
+          "default": [],
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/AttributeEvidence"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Attributes",
+          "type": "array"
+        },
+        "price": {
+          "$ref": "#/$defs/PriceBasis"
+        },
+        "goods_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Goods Id"
+        },
+        "goods_id_verified": {
+          "default": false,
+          "title": "Goods Id Verified",
+          "type": "boolean"
+        },
+        "seller_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seller Id"
+        },
+        "seller_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seller Name"
+        },
+        "manufacturer_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Manufacturer Id"
+        },
+        "manufacturer_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Manufacturer Name"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "options": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Options"
+        },
+        "item_kind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Item Kind"
+        },
+        "file_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File Path"
+        },
+        "file_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File Sha256"
+        },
+        "sheet": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sheet"
+        },
+        "row": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Row"
+        },
+        "raw_fields": {
+          "default": [],
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Raw Fields",
+          "type": "array"
+        },
+        "excluded_seller_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Excluded Seller Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "input_row_id",
+        "purpose",
+        "category_id",
+        "name_raw",
+        "spec_raw"
+      ],
+      "title": "InputItem",
+      "type": "object"
+    },
+    "MatchDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "input_row_id": {
+          "title": "Input Row Id",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/DecisionStatus"
+        },
+        "reasons": {
+          "items": {
+            "$ref": "#/$defs/ReasonCode"
+          },
+          "title": "Reasons",
+          "type": "array"
+        },
+        "candidates": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Candidates",
+          "type": "array"
+        },
+        "constraints": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ConstraintResult"
+          },
+          "title": "Constraints",
+          "type": "array"
+        },
+        "snapshot_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Snapshot Id"
+        },
+        "release_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Release Id"
+        },
+        "environment": {
+          "default": "shadow",
+          "title": "Environment",
+          "type": "string"
+        }
+      },
+      "required": [
+        "input_row_id",
+        "status",
+        "reasons"
+      ],
+      "title": "MatchDecision",
+      "type": "object"
+    },
+    "PriceBasis": {
+      "additionalProperties": false,
+      "properties": {
+        "amount": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Amount"
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Kind"
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Currency"
+        },
+        "tax_basis": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tax Basis"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        },
+        "pack_quantity": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pack Quantity"
+        }
+      },
+      "title": "PriceBasis",
+      "type": "object"
+    },
+    "Purpose": {
+      "enum": [
+        "exact_identity",
+        "same_price_competitor",
+        "functional_substitute"
+      ],
+      "title": "Purpose",
+      "type": "string"
+    },
+    "ReasonCode": {
+      "enum": [
+        "MISSING_REQUIRED_ATTRIBUTE",
+        "CONFLICTING_ATTRIBUTE",
+        "UNSUPPORTED_CATEGORY",
+        "INCOMPLETE_RETRIEVAL",
+        "STALE_EVIDENCE",
+        "RELEASE_INELIGIBLE",
+        "MISMATCH",
+        "MATCH",
+        "UNKNOWN_PRICE_BASIS",
+        "EXCLUDED_SELLER",
+        "EXPIRED_CONTRACT"
+      ],
+      "title": "ReasonCode",
+      "type": "string"
+    },
+    "ReleaseManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "release_id": {
+          "title": "Release Id",
+          "type": "string"
+        },
+        "purpose": {
+          "$ref": "#/$defs/Purpose"
+        },
+        "category_id": {
+          "title": "Category Id",
+          "type": "string"
+        },
+        "policy_hash": {
+          "title": "Policy Hash",
+          "type": "string"
+        },
+        "dataset_hash": {
+          "title": "Dataset Hash",
+          "type": "string"
+        },
+        "source_normalizer_version": {
+          "title": "Source Normalizer Version",
+          "type": "string"
+        },
+        "matching_normalizer_version": {
+          "title": "Matching Normalizer Version",
+          "type": "string"
+        },
+        "environment": {
+          "default": "shadow",
+          "title": "Environment",
+          "type": "string"
+        },
+        "schema_version": {
+          "default": "matching/1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "release_id",
+        "purpose",
+        "category_id",
+        "policy_hash",
+        "dataset_hash",
+        "source_normalizer_version",
+        "matching_normalizer_version"
+      ],
+      "title": "ReleaseManifest",
+      "type": "object"
+    },
+    "RetrievalResult": {
+      "additionalProperties": false,
+      "properties": {
+        "candidates": {
+          "items": {
+            "$ref": "#/$defs/Candidate"
+          },
+          "title": "Candidates",
+          "type": "array"
+        },
+        "scope_definition": {
+          "title": "Scope Definition",
+          "type": "string"
+        },
+        "total_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Total Count"
+        },
+        "scanned_count": {
+          "title": "Scanned Count",
+          "type": "integer"
+        },
+        "unknown_count": {
+          "title": "Unknown Count",
+          "type": "integer"
+        },
+        "scope_scan_complete": {
+          "title": "Scope Scan Complete",
+          "type": "boolean"
+        },
+        "decision_evaluation_complete": {
+          "title": "Decision Evaluation Complete",
+          "type": "boolean"
+        },
+        "truncated": {
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "termination_reason": {
+          "title": "Termination Reason",
+          "type": "string"
+        },
+        "snapshot_id": {
+          "title": "Snapshot Id",
+          "type": "string"
+        },
+        "index_generation": {
+          "title": "Index Generation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidates",
+        "scope_definition",
+        "total_count",
+        "scanned_count",
+        "unknown_count",
+        "scope_scan_complete",
+        "decision_evaluation_complete",
+        "truncated",
+        "termination_reason",
+        "snapshot_id",
+        "index_generation"
+      ],
+      "title": "RetrievalResult",
+      "type": "object"
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "type",
+    "payload"
+  ],
+  "properties": {
+    "schema": {
+      "const": "matching/1"
+    },
+    "type": {
+      "enum": [
+        "InputItem",
+        "Candidate",
+        "ConstraintResult",
+        "RetrievalResult",
+        "MatchDecision",
+        "ReleaseManifest",
+        "AttributeEvidence",
+        "PriceBasis"
+      ]
+    },
+    "payload": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/InputItem"
+        },
+        {
+          "$ref": "#/$defs/Candidate"
+        },
+        {
+          "$ref": "#/$defs/ConstraintResult"
+        },
+        {
+          "$ref": "#/$defs/RetrievalResult"
+        },
+        {
+          "$ref": "#/$defs/MatchDecision"
+        },
+        {
+          "$ref": "#/$defs/ReleaseManifest"
+        },
+        {
+          "$ref": "#/$defs/AttributeEvidence"
+        },
+        {
+          "$ref": "#/$defs/PriceBasis"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nara"
+version = "0.1.0"
+description = "G2B catalog collection, matching and workbook tools"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "requests==2.34.2",
+    "openpyxl==3.1.5",
+    "pillow==13.0.0",
+    "xlrd==2.0.2",
+    "pydantic==2.14.1",
+]
+
+[project.optional-dependencies]
+analytics = ["pyarrow==26.0.0", "duckdb==2.0.0"]
+matching = [
+    "numpy==2.5.4",
+    "scipy==1.18.1",
+    "scikit-learn==1.9.1",
+    "catboost==1.2.10",
+    "python-dateutil==2.9.0.post0",
+]
+orchestration = ["prefect[redis]==3.9.0", "prefect-redis==0.3.0"]
+
+[project.scripts]
+nara = "src.updater.cli:main"
+nara-catalog = "src.catalog_cli:main"
+nara-match = "src.matching.cli:main"
+
+[dependency-groups]
+dev = ["ruff==0.17.1", "basedpyright==1.40.2"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["core*", "src*"]
+
+[tool.setuptools.package-data]
+"core.matching" = ["policies/*.json", "schemas/*.json"]
+"core.updater" = ["schemas/*.json"]

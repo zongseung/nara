@@ -11,3 +11,9 @@ storage/
 *.parquet
 *.duckdb
 *.xls
+.omo/
+/docs/research/
+/docker/.env
+*.egg-info/
+/build/
+/dist/

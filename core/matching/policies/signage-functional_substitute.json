@@ -1,0 +1,36 @@
+{
+  "version": "1",
+  "state": "draft",
+  "freshness_hours": "36",
+  "required_groups": [
+    "contract",
+    "item",
+    "price"
+  ],
+  "required_certificates": [],
+  "allow_rotation": false,
+  "policy_id": "signage-functional_substitute",
+  "purpose": "functional_substitute",
+  "category_ids": [
+    "signage"
+  ],
+  "item_kind": "main",
+  "rules": [
+    {
+      "field": "dimensions",
+      "operator": "eq",
+      "unit": "mm",
+      "required": true,
+      "tolerance": "0",
+      "value": null
+    },
+    {
+      "field": "material",
+      "operator": "eq",
+      "unit": "text",
+      "required": true,
+      "tolerance": "0",
+      "value": null
+    }
+  ]
+}

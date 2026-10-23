@@ -1,0 +1,273 @@
+"""
+나라장터 '품목등록결과'(.xls) → 협상품목리스트(분석용)(.xlsx) 변환 CLI.
+
+입력 파일만 주면 각 시트(업체)의 헤더를 **헤더명 기준으로 자동인식**해서 따라감.
+시트마다 컬럼 위치가 달라도(예: 지피가든 22열) 안전. 하드코딩 위치 없음.
+
+    python format_convert.py "입력.xls"
+    python format_convert.py "입력.xls" --out 협상품목리스트.xlsx --days 40 --qty 5
+
+매핑:  식별번호←물품식별번호 · 품명←한글품명 첫토큰 · 규격←한글품명 · 희망가←희망가(부가세포함)
+       납품일수/공급예정수량 = 고정값(--days/--qty).  식별번호 없으면 빈칸으로 둠(한글품명 기준).
+"""
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from core.matching.contracts import InputItem, Purpose
+
+import xlrd
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+
+OUT_HDR = ["식별번호", "품 명", "규 격", "납품일수", "공급예정수량", "희망가\n(부가세포함)"]
+WIDTHS = [14, 8, 52, 10, 13, 15]
+
+THIN = Side(style="thin", color="9AA0B4")
+BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
+CENTER = Alignment(horizontal="center", vertical="center", wrap_text=True)
+LEFT = Alignment(horizontal="left", vertical="center")
+HDR_FILL = PatternFill("solid", fgColor="D9E1F2")
+YELLOW = PatternFill("solid", fgColor="FFF2CC")
+GOLD = PatternFill("solid", fgColor="FFD966")
+BOLD = Font(bold=True)
+
+
+def _norm(h):
+    return str(h).replace("\n", "").replace("*", "").strip()
+
+
+def _find_header(sh):
+    """헤더 행 + {정규화헤더명: 열인덱스}. 물품식별번호/한글품명 있는 행을 헤더로."""
+    for r in range(min(sh.nrows, 15)):
+        cells = [_norm(sh.cell_value(r, c)) for c in range(sh.ncols)]
+        if "물품식별번호" in cells and "한글품명" in cells:
+            return r, {c: i for i, c in enumerate(cells) if c}
+    raise ValueError("헤더(물품식별번호/한글품명)를 못 찾음")
+
+
+def _clean_id(v):
+    s = str(v).strip()
+    return s.removesuffix(".0")
+
+
+def _to_int(v):
+    try:
+        return int(float(v))
+    except (TypeError, ValueError):
+        return v
+
+
+def read_rows(sh):
+    """시트 → [[식별번호, 품명, 규격, None, None, 희망가], ...] (헤더명 자동매핑)."""
+    hr, col = _find_header(sh)
+    ci_id, ci_nm, ci_pr = col["물품식별번호"], col["한글품명"], col.get("희망가(부가세포함)")
+    out = []
+    for r in range(hr + 1, sh.nrows):
+        spec = str(sh.cell_value(r, ci_nm)).strip()   # 한글품명 = 규격(패킹 문자열), 앞 탭 제거
+        if not spec:
+            continue                                   # 한글품명이 실질 키
+        idnf = _clean_id(sh.cell_value(r, ci_id))
+        pumnm = spec.split(",")[0].strip() or "품목"
+        price = _to_int(sh.cell_value(r, ci_pr)) if ci_pr is not None else ""
+        out.append([idnf, pumnm, spec, None, None, price])
+    return out
+
+
+def read_items(in_path):
+    """비교 매칭용: {업체: [{품명,규격,재질,용도,가격,모델,식별번호}]}. .xls 전용 컬럼 사용."""
+    from core.catalog_sources import JsonValue
+    from core.legacy_matching import extract
+    wb = xlrd.open_workbook(in_path)
+    result = {}
+    for name in wb.sheet_names():
+        sh = wb.sheet_by_name(name)
+        hr, col = _find_header(sh)
+        items = []
+        for r in range(hr + 1, sh.nrows):
+            spec = str(sh.cell_value(r, col["한글품명"])).strip()
+            if not spec:
+                continue
+
+            def cell(cn, columns=col, sheet=sh, row_index=r):
+                i = columns.get(cn)
+                return str(sheet.cell_value(row_index, i)).strip() if i is not None else ""
+
+            price = cell("희망가(부가세포함)").replace(",", "")
+            raw: dict[str, JsonValue] = {"itemIdnfNm":spec, "itemIdnfNo":_clean_id(cell("물품식별번호")),
+                   "mnftrEtpsNm":name, "ctrtUprc":price or None,
+                   "itemClsfNo":_clean_id(cell("물품분류번호")),
+                   "dtlsPrnmNo":_clean_id(cell("세부품명번호")),
+                   "imgSrc":cell("이미지URL") or cell("이미지"),
+                   "_detail_attributes":[{"atrbnm":key.removeprefix("(대표)"),
+                       "atrbvalue":cell(key),"atrboptnvalue":None} for key in col if cell(key)],
+                   "_input_file":str(in_path), "_input_sheet":name, "_input_row":r+1}
+            item = extract(raw)
+            item["모델"] = cell("모델명") or item["모델"]
+            items.append(item)
+        result[name] = items
+    return result
+
+
+def _write_sheet(ws, company, rows, days, qty):
+    cat = rows[0][1] if rows else "품목"
+    ws.merge_cells("A1:F1")
+    t = ws["A1"]; t.value = f"{company} '{cat}' 협상품목리스트(분석용)"
+    t.font = Font(bold=True, size=14); t.alignment = LEFT
+    ws.append([])
+    ws.append(OUT_HDR)
+    for c in range(1, 7):
+        cell = ws.cell(row=3, column=c)
+        cell.font = BOLD; cell.alignment = CENTER; cell.border = BORDER
+        cell.fill = GOLD if c == 6 else HDR_FILL
+    for row in rows:
+        row[3], row[4] = days, qty
+        ws.append(row)
+        rr = ws.max_row
+        for c in range(1, 7):
+            cell = ws.cell(row=rr, column=c)
+            cell.border = BORDER
+            cell.alignment = LEFT if c == 3 else CENTER
+            if c == 5:
+                cell.fill = YELLOW
+            if c == 6:
+                cell.number_format = "#,##0"
+    for i, w in enumerate(WIDTHS, 1):
+        ws.column_dimensions[chr(64 + i)].width = w
+
+
+def read_all(in_path):
+    wb_in = xlrd.open_workbook(in_path)
+    return {name: read_rows(wb_in.sheet_by_name(name)) for name in wb_in.sheet_names()}
+
+
+def to_markdown(rows, days, qty, max_spec=48):
+    """행 목록 → 마크다운 표 문자열. 규격이 길면 잘라서 표시."""
+    cols = ["식별번호", "품명", "규격", "납품일수", "공급예정수량", "희망가(부가세포함)"]
+    md = ["| " + " | ".join(cols) + " |", "|" + "|".join([":--"] * len(cols)) + "|"]
+    for idnf, pumnm, spec, _, _, price in rows:
+        s = str(spec).replace("|", "/")
+        if len(s) > max_spec:
+            s = s[:max_spec - 1] + "…"
+        pr = f"{price:,}" if isinstance(price, int) else price
+        md.append(f"| {idnf or '-'} | {pumnm} | {s} | {days} | {qty} | {pr} |")
+    return "\n".join(md)
+
+
+def write_xlsx(data, out_path, days, qty):
+    wb = Workbook(); wb.remove(wb.worksheets[0])
+    for name, rows in data.items():
+        _write_sheet(wb.create_sheet(name[:31]), name, rows, days, qty)
+    wb.save(out_path)
+    return out_path
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("input", help="품목등록결과 .xls 경로")
+    ap.add_argument("--out", default="협상품목리스트_분석용.xlsx")
+    ap.add_argument("--days", type=int, default=40, help="납품일수 고정값")
+    ap.add_argument("--qty", type=int, default=5, help="공급예정수량 고정값")
+    ap.add_argument("--rows", type=int, default=0, help="시트당 미리보기 행수(0=전체)")
+    ap.add_argument("--no-xlsx", action="store_true", help="미리보기만, 엑셀 저장 안 함")
+    a = ap.parse_args()
+
+    data = read_all(a.input)
+    for name, rows in data.items():                       # 엑셀 전에 마크다운 표로 미리보기
+        shown = rows[:a.rows] if a.rows else rows
+        print(f"\n## {name}  ({len(rows)}건)\n")
+        print(to_markdown(shown, a.days, a.qty))
+        if a.rows and len(rows) > a.rows:
+            print(f"\n_… 외 {len(rows) - a.rows}건_")
+
+    total = sum(len(r) for r in data.values())
+    if a.no_xlsx:
+        print(f"\n미리보기 전용 (총 {total}건, 엑셀 미저장)")
+    else:
+        write_xlsx(data, a.out, a.days, a.qty)
+        print(f"\n엑셀 저장 → {a.out}  (총 {total}건)")
+
+
+if __name__ == "__main__":
+    main()
+
+
+def read_input_items(in_path: str | Path, *, purpose: Purpose, category_id: str) -> tuple[InputItem, ...]:
+    """Read XLS/XLSX into strict matching DTOs, preserving row provenance.
+
+    Purpose/category come from the caller, never from editable workbook flags.
+    Legacy read_items/read_all remain unchanged.
+    """
+    import re
+    from contextlib import closing
+    from decimal import Decimal, InvalidOperation
+    from hashlib import sha256
+
+    from openpyxl import load_workbook
+
+    from core.matching.contracts import ContractError, InputItem, PriceBasis, Purpose
+    from core.matching.normalization import normalize_dimensions, normalize_material
+
+    path = Path(in_path)
+    if not isinstance(purpose, Purpose):
+        raise ContractError('purpose')
+    digest = sha256(path.read_bytes()).hexdigest()
+    sheets = []
+    match path.suffix.lower():
+        case '.xlsx':
+            with closing(load_workbook(path, read_only=True, data_only=False)) as workbook:
+                for sheet in workbook.worksheets:
+                    sheets.append((sheet.title, [tuple(row) for row in sheet.iter_rows(values_only=True)]))
+        case '.xls':
+            with xlrd.open_workbook(str(path)) as workbook:
+                for sheet in workbook.sheets():
+                    sheets.append((sheet.name, [tuple(sheet.row_values(row)) for row in range(sheet.nrows)]))
+        case _:
+            raise ContractError('file', 'expected XLS or XLSX')
+    result = []
+    for sheet_name, rows in sheets:
+        header = None
+        for index, row in enumerate(rows[:15]):
+            names = [_norm(value) if value is not None else '' for value in row]
+            if '물품식별번호' in names and '한글품명' in names:
+                nonempty = [value for value in names if value]
+                if len(set(nonempty)) != len(nonempty):
+                    raise ContractError(f'{sheet_name}:{index+1}', 'duplicate headers')
+                header = index, {name: col for col, name in enumerate(names) if name}
+                break
+        if header is None:
+            raise ContractError(sheet_name, 'missing required headers')
+        index, columns = header
+        for row_number, row in enumerate(rows[index+1:], start=index+2):
+            raw = {key: str(row[col]).strip() if col < len(row) and row[col] is not None else '' for key,col in columns.items()}
+            spec = raw['한글품명']
+            if not spec:
+                if any(raw.values()):
+                    raise ContractError(f'{sheet_name}:{row_number}', 'name missing')
+                continue
+            if any(raw[key].startswith('=') for key in ('한글품명','물품식별번호')):
+                raise ContractError(f'{sheet_name}:{row_number}', 'formula in required field')
+            price_text = raw.get('희망가(부가세포함)', '')
+            amount = None
+            if price_text:
+                try:
+                    if not re.fullmatch(r'(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?', price_text):
+                        raise ContractError('price', 'invalid numeric price or formula')
+                    amount = Decimal(price_text.replace(',', ''))
+                except InvalidOperation as exc:
+                    raise ContractError('price') from exc
+            price = PriceBasis(amount=amount, kind='desired_price' if price_text else None,
+                tax_basis='included' if price_text else None)
+            dimensions = normalize_dimensions(spec, '한글품명')
+            result.append(InputItem(
+                input_row_id=sha256(f'{digest}:{sheet_name}:{row_number}'.encode()).hexdigest(),
+                purpose=purpose, category_id=category_id, name_raw=spec, spec_raw=spec,
+                attributes=(('dimensions', dimensions), ('material', normalize_material(raw.get('재질',''), '재질'))),
+                price=price, goods_id=_clean_id(raw['물품식별번호']) or None,
+                seller_name=raw.get('계약업체') or None, manufacturer_name=raw.get('제조사') or None,
+                model=raw.get('모델명') or None, file_path=str(path), file_sha256=digest,
+                sheet=sheet_name, row=row_number, raw_fields=tuple(raw.items())))
+    return tuple(result)

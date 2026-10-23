@@ -1,0 +1,19 @@
+{
+  "version": "1",
+  "state": "draft",
+  "freshness_hours": "36",
+  "required_groups": [
+    "contract",
+    "item",
+    "price"
+  ],
+  "required_certificates": [],
+  "allow_rotation": false,
+  "policy_id": "generic-exact-identity",
+  "purpose": "exact_identity",
+  "category_ids": [
+    "generic_identity"
+  ],
+  "item_kind": "main",
+  "rules": []
+}

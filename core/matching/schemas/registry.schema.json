@@ -1,0 +1,59 @@
+{
+  "$defs": {
+    "Approval": {
+      "additionalProperties": false,
+      "properties": {
+        "pair_key": {
+          "title": "Pair Key",
+          "type": "string"
+        },
+        "evidence_hash": {
+          "title": "Evidence Hash",
+          "type": "string"
+        },
+        "approved_at": {
+          "format": "date-time",
+          "title": "Approved At",
+          "type": "string"
+        },
+        "expires_at": {
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "reviewer": {
+          "title": "Reviewer",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pair_key",
+        "evidence_hash",
+        "approved_at",
+        "expires_at",
+        "reviewer"
+      ],
+      "title": "Approval",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "approvals": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Approval"
+      },
+      "title": "Approvals",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "matching-registry/1",
+      "default": "matching-registry/1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "title": "Registry",
+  "type": "object"
+}
