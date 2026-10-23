@@ -125,6 +125,15 @@ class CompanyComparisonTests(unittest.TestCase):
         self.assertFalse(self.out.exists())
         self.assertEqual(len(self.calls),1)
 
+    def test_help_displays_percentage_without_any_source_access(self):
+        stdout = io.StringIO()
+        with patch('sys.argv',['compare_file.py','--help']), redirect_stdout(stdout), \
+                self.assertRaises(SystemExit) as exit_status:
+            main()
+        self.assertEqual(exit_status.exception.code, 0)
+        self.assertIn('10%', stdout.getvalue())
+        self.assertEqual(self.calls, [])
+
     def test_invalid_sources_and_settings_fail_before_any_source_access(self):
         for options in ([],['input.xls','--company','지피코리아'],['--company',' '],
                         ['--company','지피코리아','--company','주식회사 지피코리아'],

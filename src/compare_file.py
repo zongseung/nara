@@ -24,7 +24,7 @@ def main():
     ap.add_argument("--keyword", default="", help="업체 품목 조회를 제한할 키워드")
     ap.add_argument("--out", default="가격비교표.xlsx", help="출력 .xlsx 경로 (상위 폴더 자동 생성, 기존 파일 덮어쓰기 금지)")
     ap.add_argument("--top", type=int, default=3, help="업체당 경쟁사 후보 수")
-    ap.add_argument("--exact-price", action="store_true", help="같은 단가에서 검색 (규격 ±10%·지지대 개수 일치 등 필수 검사 유지)")
+    ap.add_argument("--exact-price", action="store_true", help="같은 단가에서 검색 (규격 ±10%%·지지대 개수 일치 등 필수 검사 유지)")
     ap.add_argument("--limit", type=int, default=0, help="시트당 품목 수 상한(0=전체)")
     ap.add_argument("--fallback-band", type=float, default=None,
                     help="--exact-price 무매칭 시 ±비율 가격대 재검색 (기본 0.3)")
