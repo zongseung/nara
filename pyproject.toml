@@ -27,6 +27,7 @@ matching = [
     "python-dateutil==2.9.0.post0",
 ]
 orchestration = ["prefect[redis]==3.9.0", "prefect-redis==0.3.0"]
+web = ["fastapi==0.150.0", "uvicorn==0.54.0", "httpx==0.28.1", "redis==8.1.0"]
 
 [project.scripts]
 nara = "src.updater.cli:main"
@@ -43,3 +44,4 @@ include = ["core*", "src*"]
 [tool.setuptools.package-data]
 "core.matching" = ["policies/*.json", "schemas/*.json"]
 "core.updater" = ["schemas/*.json"]
+"src.web" = ["static/*"]
