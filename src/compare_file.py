@@ -25,6 +25,7 @@ def main():
     ap.add_argument("--out", default="가격비교표.xlsx", help="출력 .xlsx 경로 (상위 폴더 자동 생성, 기존 파일 덮어쓰기 금지)")
     ap.add_argument("--top", type=int, default=3, help="업체당 경쟁사 후보 수")
     ap.add_argument("--exact-price", action="store_true", help="같은 단가에서 검색 (규격 ±10%%·지지대 개수 일치 등 필수 검사 유지)")
+    ap.add_argument("--same-direction", action="store_true", help="선택 조건: 알려진 방향 수까지 같아야 함 (기본은 차이 허용)")
     ap.add_argument("--limit", type=int, default=0, help="시트당 품목 수 상한(0=전체)")
     ap.add_argument("--fallback-band", type=float, default=None,
                     help="--exact-price 무매칭 시 ±비율 가격대 재검색 (기본 0.3)")
@@ -58,6 +59,8 @@ def main():
     if diagnostic and (a.mode != "suggest" or a.catalog_manifest):
         ap.error("diagnostic catalog options are suggest-only and cannot mix with a manifest")
     if a.mode != "suggest":
+        if a.same_direction:
+            ap.error("--same-direction은 suggest 모드에서만 사용합니다")
         if a.fallback_band not in (None, 0):
             ap.error("shadow/auto require --fallback-band 0")
         required = ("purpose", "category", "catalog_manifest", "source_root", "policy_dir", "release", "ledger", "index_dir")
@@ -119,7 +122,8 @@ def main():
     # 입력 파일의 모든 업체(계열사)를 서로 경쟁 풀에서 제외
     build_report.build_multi(companies, a.out, top_n=a.top, exact_price=exact_price,
                              exclude_companies=list(companies),
-                             fallback_band=a.fallback_band, workers=a.workers, provider=provider)
+                             fallback_band=a.fallback_band, workers=a.workers, provider=provider,
+                             same_direction=a.same_direction)
     print("저장:", a.out)
 
 

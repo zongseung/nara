@@ -103,7 +103,7 @@ def build(our_items, out_path, top_n=3, our_company="제안업체", exclude_comp
 
 
 def build_multi(companies, out_path, top_n=3, exact_price=True,
-                exclude_companies=None, fallback_band=0.0, workers=8, provider=None):
+                exclude_companies=None, fallback_band=0.0, workers=8, provider=None, same_direction=False):
     """{업체명: [our_item...]} → 업체별 시트. 동시(ThreadPool) 매칭 후 렌더. 기본 계열사 상호 제외.
     provider=None이면 실시간 쇼핑몰을 조회하고 사진을 내려받아 삽입한다."""
     output = prepare_output(out_path)
@@ -114,7 +114,7 @@ def build_multi(companies, out_path, top_n=3, exact_price=True,
     def work(t):
         name, i, it = t
         it, cands = compare(it, source, top_n=top_n, exact_price=exact_price,
-                            fallback_band=fallback_band, excluded=excl)
+                            fallback_band=fallback_band, excluded=excl, same_direction=same_direction)
         mark = " (근사)" if cands and cands[0].get("근사") else ""
         print(f"[{name}] {it.get('모델') or it.get('품명')} ({it.get('가격') or 0:,}) → 후보 {len(cands)}개{mark}", flush=True)
         if it.get("비교보류사유"):
@@ -126,11 +126,18 @@ def build_multi(companies, out_path, top_n=3, exact_price=True,
         for name, i, it, cands in ex.map(work, tasks):
             results.setdefault(name, {})[i] = (it, cands)
 
+    pairs = {name: [results[name][i] for i in range(len(items))] for name, items in companies.items()}
+    render_multi(pairs, output, top_n=top_n, provider=provider)
+    return out_path
+
+
+def render_multi(companies, out_path, top_n=3, provider=None):
+    output = prepare_output(out_path)
     wb = Workbook(); wb.remove(wb.worksheets[0])
     with requests.Session() as session:
-        for name, items in companies.items():
+        for name, pairs in companies.items():
             ws = wb.create_sheet(name[:31])
-            _render_pairs(ws, name, [results[name][i] for i in range(len(items))], top_n, session, provider)
+            _render_pairs(ws, name, pairs, top_n, session, provider)
         _save(wb, output)
     return out_path
 
@@ -170,8 +177,10 @@ def _render_pairs(ws, our_company, pairs, top_n, session, provider=None):
         _put(ws, r, 4, our_company, OUR_FILL, bold=True)
         for j, c in enumerate(cands):
             ap = c.get("근사")
-            header = _put(ws, r, 5 + j, c["업체"] + (" (근사)" if ap else ""),
-                          APPROX_FILL if ap else HEADER_FILL, bold=True)
+            review = c.get("비교구분", "")
+            label = f" [{review}]" if review in ("확인 필요", "대안 후보") else ""
+            header = _put(ws, r, 5 + j, c["업체"] + label + (" (근사)" if ap else ""),
+                          APPROX_FILL if ap or label else HEADER_FILL, bold=True)
             if c.get("매칭근거"):
                 header.comment = Comment(c["매칭근거"], "비교 근거")
         for j in range(len(cands), top_n):

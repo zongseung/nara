@@ -113,7 +113,7 @@ class CompanyComparisonTests(unittest.TestCase):
             self.assertEqual(len([name for name in archive.namelist() if name.startswith('xl/media/')]),12)
         self.assertEqual(self.image_calls,12)
         self.assertTrue(all(query['searchKeyword']=='안내판' for query in self.calls if query['etpsNm']))
-        self.assertTrue(all(query['searchKeyword']=='안내판 종합안내' for query in self.calls if not query['etpsNm']))
+        self.assertTrue(all(query['searchKeyword']=='안내판' for query in self.calls if not query['etpsNm']))
         self.assertFalse((self.out.parent/'storage').exists())
 
     def test_company_filter_never_uses_a_different_company_as_our_items(self):
@@ -165,7 +165,7 @@ class CompanyComparisonTests(unittest.TestCase):
             item.update(ctrtUprc=str(price),itemIdnfNm=f'안내판, {identity}, {size}, {face}',
                         pdctAtrbCdDtlNm=f'재질:{material},용도:{use},지지대수:0개',dtlsPrnmNo=category)
             self.candidates.append(item)
-        with patch('sys.argv',['compare_file.py','--company','지피코리아','--limit','1',
+        with patch('sys.argv',['compare_file.py','--company','지피코리아','--limit','1','--same-direction',
                                '--workers','1','--out',str(self.out)]), redirect_stdout(io.StringIO()):
             main()
         book = load_workbook(self.out)
@@ -210,7 +210,7 @@ class CompanyComparisonTests(unittest.TestCase):
                            pdctAtrbCdDtl=f'Uvalue${use}|Ovalue${option}',
                            pdctAtrbCdDtlNm='재질:목재,지지대수:0개')
             self.candidates.append(product)
-        with patch('sys.argv', ['compare_file.py', '--company', '지피코리아', '--limit', '1',
+        with patch('sys.argv', ['compare_file.py', '--company', '지피코리아', '--limit', '1', '--same-direction',
                                 '--workers', '1', '--out', str(self.out)]), redirect_stdout(io.StringIO()):
             main()
         with self.out.open('rb') as stream:
@@ -277,6 +277,7 @@ class CompanyComparisonTests(unittest.TestCase):
             build([], output)
         self.assertEqual(output.read_bytes(), original)
 
+    @patch('core.comparison.CHECK_SUPPORTS', True)
     def test_comparison_requires_matching_supports_and_each_dimension_within_ten_percent(self):
         self.product_overrides['ours1'] = {'pdctAtrbCdDtlNm':'재질:목재,용도:종합안내,지지대수:1개'}
         self.candidates = []
@@ -304,6 +305,7 @@ class CompanyComparisonTests(unittest.TestCase):
         self.assertEqual([sheet.cell(3,c).value for c in (5,6,7)], ['minimum','nearby','maximum'])
         self.assertIn('지지대 1개', sheet['D8'].value)
 
+    @patch('core.comparison.CHECK_SUPPORTS', True)
     def test_unknown_reference_support_count_defers_comparison_with_visible_reason(self):
         self.product_overrides['ours1'] = {'pdctAtrbCdDtlNm':'재질:목재,용도:종합안내'}
         with patch('sys.argv',['compare_file.py','--company','지피코리아','--limit','1',
@@ -317,6 +319,7 @@ class CompanyComparisonTests(unittest.TestCase):
         self.assertIn('미확인', sheet['E3'].value)
         self.assertFalse(any(not query['etpsNm'] for query in self.calls))
 
+    @patch('core.comparison.CHECK_SUPPORTS', True)
     def test_exact_price_does_not_bypass_support_and_dimension_checks(self):
         self.product_overrides['ours1'] = {'pdctAtrbCdDtlNm':'재질:목재,용도:종합안내,지지대수:0개'}
         self.candidates = []
@@ -338,6 +341,7 @@ class CompanyComparisonTests(unittest.TestCase):
         self.assertIsNone(sheet['F4'].value)
         self.assertIsNone(sheet['G4'].value)
 
+    @patch('core.comparison.CHECK_SUPPORTS', True)
     def test_approximate_price_retry_keeps_structure_and_local_price_bounds(self):
         self.candidates = []
         for identity, size, supports, price in (('two_legs','600×150mm',2,105),

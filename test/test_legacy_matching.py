@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from core.catalog_sources import JsonValue
 from core.comparison import CandidatePage, compare, compatible
@@ -14,6 +15,7 @@ from core.matching.normalization import material_rank
 
 
 class LegacyMatchingTests(unittest.TestCase):
+    @patch('core.comparison.CHECK_SUPPORTS', True)
     def test_compare_runs_on_an_injected_provider_without_network(self):
         class Provider:
             def __init__(self, rows):
@@ -86,7 +88,7 @@ class LegacyMatchingTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertEqual(direction_count(text), expected)
 
-    def test_purpose_formatting_is_shared_by_compatibility_and_score(self):
+    def test_purpose_formatting_affects_score_without_rejecting_other_uses(self):
         base = extract({'itemIdnfNm': '안내판, AB12, 600×150mm',
                         'pdctAtrbCdDtlNm': '용도:1방향안내,지지대수:0개'})
         for use in ('방향안내/1방향', '방향안내／１ 방향', '방향안내&#47;1방향', '일방향안내'):
@@ -98,7 +100,7 @@ class LegacyMatchingTests(unittest.TestCase):
         for use in ('2방향안내', '1방향안내 아님', '공원1방향안내', '1방향안내/입간판형',
                     '1방향안내/2층', '방향안내', '종합안내', ''):
             with self.subTest(different=use):
-                self.assertFalse(compatible(base, dict(base, 용도=use)))
+                self.assertTrue(compatible(base, dict(base, 용도=use)))
 
     def test_options_do_not_invent_supports_or_replace_material_size_or_price(self):
         for option, supports in (('기둥미포함', 0), ('', None), ('75각 2개', None),

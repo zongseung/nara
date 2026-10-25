@@ -20,6 +20,8 @@ ComparisonItem = TypedDict("ComparisonItem", {
     "점수": NotRequired[float], "점수상세": NotRequired[dict[str, float]], "규격가격우선": NotRequired[bool],
     "매칭근거": NotRequired[str], "근사": NotRequired[bool], "catalog_metadata": NotRequired[dict[str, JsonValue]],
     "비교보류사유": NotRequired[str],
+    "비교구분": NotRequired[str], "확인사항": NotRequired[list[str]],
+    "후보진단": NotRequired[dict[str, int]],
 })
 
 
