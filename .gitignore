@@ -13,6 +13,7 @@ storage/
 *.xls
 .omo/
 /docs/research/
+/DESIGN.md
 /docker/.env
 *.egg-info/
 /build/

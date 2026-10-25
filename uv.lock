@@ -906,6 +906,12 @@ orchestration = [
     { name = "prefect", extra = ["redis"] },
     { name = "prefect-redis" },
 ]
+web = [
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "redis" },
+    { name = "uvicorn" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -917,6 +923,8 @@ dev = [
 requires-dist = [
     { name = "catboost", marker = "extra == 'matching'", specifier = "==1.2.10" },
     { name = "duckdb", marker = "extra == 'analytics'", specifier = "==2.0.0" },
+    { name = "fastapi", marker = "extra == 'web'", specifier = "==0.150.0" },
+    { name = "httpx", marker = "extra == 'web'", specifier = "==0.28.1" },
     { name = "numpy", marker = "extra == 'matching'", specifier = "==2.5.4" },
     { name = "openpyxl", specifier = "==3.1.5" },
     { name = "pillow", specifier = "==13.0.0" },
@@ -925,12 +933,14 @@ requires-dist = [
     { name = "pyarrow", marker = "extra == 'analytics'", specifier = "==26.0.0" },
     { name = "pydantic", specifier = "==2.14.1" },
     { name = "python-dateutil", marker = "extra == 'matching'", specifier = "==2.9.0.post0" },
+    { name = "redis", marker = "extra == 'web'", specifier = "==8.1.0" },
     { name = "requests", specifier = "==2.34.2" },
     { name = "scikit-learn", marker = "extra == 'matching'", specifier = "==1.9.1" },
     { name = "scipy", marker = "extra == 'matching'", specifier = "==1.18.1" },
+    { name = "uvicorn", marker = "extra == 'web'", specifier = "==0.54.0" },
     { name = "xlrd", specifier = "==2.0.2" },
 ]
-provides-extras = ["analytics", "matching", "orchestration"]
+provides-extras = ["analytics", "matching", "orchestration", "web"]
 
 [package.metadata.requires-dev]
 dev = [

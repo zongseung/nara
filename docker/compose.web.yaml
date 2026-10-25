@@ -1,0 +1,94 @@
+x-runtime: &runtime
+  restart: unless-stopped
+  init: true
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs: ["/tmp:size=256m,mode=1777"]
+  mem_limit: 512m
+  memswap_limit: 512m
+  pids_limit: 256
+  logging:
+    driver: local
+    options: {max-size: "10m", max-file: "3"}
+x-web: &web
+  <<: *runtime
+  image: nara-web:local
+  build: {context: .., dockerfile: docker/web.Dockerfile}
+  environment:
+    PREFECT_API_URL: http://prefect-server:4200/api
+    PREFECT_API_AUTH_STRING: ${PREFECT_AUTH_STRING:?Set PREFECT_AUTH_STRING}
+    PREFECT_SERVER_ALLOW_EPHEMERAL_MODE: "false"
+    NARA_WEB_DATA_DIR: /data
+    NARA_WEB_POOL: nara-web
+    NARA_WEB_HOSTS: ${NARA_WEB_HOSTS:-localhost,127.0.0.1}
+    NARA_WEB_REDIS_URL: redis://web-cache:6379/0
+  volumes: [web-data:/data]
+services:
+  postgres:
+    extends: {file: compose.yaml, service: postgres}
+  redis:
+    extends: {file: compose.yaml, service: redis}
+  prefect-server:
+    extends: {file: compose.yaml, service: prefect-server}
+  prefect-services:
+    extends: {file: compose.yaml, service: prefect-services}
+  web-cache:
+    <<: *runtime
+    image: redis:7-alpine@sha256:ee64a64eaab618d88051c3ade8f6352d11531fcf79d9a4818b9b183d8c1d18ba
+    user: "999:999"
+    command: [redis-server, --save, "", --appendonly, "no", --maxmemory, "128mb", --maxmemory-policy, allkeys-lru, --maxclients, "128"]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+  web-bootstrap:
+    <<: *web
+    restart: "no"
+    command: [python, -m, src.web, register]
+    depends_on:
+      prefect-server: {condition: service_healthy}
+  web-api:
+    <<: *web
+    depends_on:
+      web-bootstrap: {condition: service_completed_successfully}
+      web-cache: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+  web-worker:
+    <<: *web
+    command: [python, -m, src.web, worker]
+    mem_limit: ${NARA_WORKER_MEMORY:-2g}
+    memswap_limit: ${NARA_WORKER_MEMORY:-2g}
+    stop_grace_period: 90s
+    depends_on:
+      web-bootstrap: {condition: service_completed_successfully}
+  web-gateway:
+    <<: *runtime
+    image: nara-web-gateway:local
+    build:
+      context: ..
+      dockerfile: docker/nginx.Dockerfile
+      args: {NGINX_CONFIG: docker/nginx.web.conf}
+    user: "101:101"
+    entrypoint: [nginx]
+    command: [-g, "daemon off;"]
+    mem_limit: 128m
+    memswap_limit: 128m
+    pids_limit: 32
+    ports: ["${NARA_WEB_BIND:-127.0.0.1}:${NARA_WEB_PORT:-8080}:8080"]
+    depends_on:
+      web-api: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+volumes:
+  prefect-postgres:
+  prefect-redis:
+  web-data:

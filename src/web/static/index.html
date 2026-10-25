@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="나라장터 품목을 조회하고 경쟁사를 검토한 뒤 가격비교표를 만듭니다.">
+  <meta name="color-scheme" content="light">
+  <title>nara · 조달 비교 플랫폼</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="bar">
+    <a class="brand" href="#conditions" aria-label="nara 새 작업">nara</a>
+    <nav class="steps" aria-label="비교 단계">
+      <button data-step="conditions" aria-current="step"><span>1</span>조건</button><i></i>
+      <button data-step="collect" disabled><span>2</span>수집</button><i></i>
+      <button data-step="review" disabled><span>3</span>검토</button><i></i>
+      <button data-step="export" disabled><span>4</span>비교표</button>
+    </nav>
+    <label class="job-picker"><span class="sr-only">최근 작업</span><select id="recent"><option value="">새 작업</option></select></label>
+  </header>
+  <main id="main" tabindex="-1">
+    <div id="notice" role="alert" hidden></div>
+    <section id="conditions">
+      <div class="heading"><h1>새 비교 작업</h1><p>기준 업체 품목마다 조건이 맞는 경쟁사를 찾아 가격비교표를 만듭니다.</p></div>
+      <div class="conditions-grid">
+        <form id="job-form">
+          <h2>기준 업체와 품목</h2>
+          <div class="form-group"><label class="field">기준 업체<input name="company" autocomplete="organization" value="지피코리아" required maxlength="120"></label><p>법인격과 공백을 뺀 이름이 같은 제조업체 품목만 기준으로 잡습니다.</p></div>
+          <div class="form-group"><label class="field">품목 검색어<input name="keyword" value="안내판" maxlength="200"></label><p>기준 업체 품목만 좁힙니다. 경쟁사는 품명으로 찾고 용도는 순위에만 반영합니다.</p></div>
+          <div class="pair">
+            <div class="form-group"><label class="field">기준 품목 수<input name="limit" class="number" type="number" min="0" max="10000" value="0" required></label><p>기본은 전체(0), 업체당 최대 10,000건. 일부 테스트는 3 등을 입력하세요.</p></div>
+            <div class="form-group"><label class="field">품목당 경쟁사<input name="top" class="number" type="number" min="1" max="10" value="3" required></label><p>조건이 맞는 후보가 없으면 칸이 비어 있습니다.</p></div>
+          </div>
+          <h2 class="section-title">가격 비교 방식</h2>
+          <fieldset class="seg"><legend class="sr-only">가격 비교 방식</legend><label><input name="price" type="radio" value="higher" checked><span>기본 보강 비교</span></label><label><input name="price" type="radio" value="exact"><span>동일단가</span></label></fieldset>
+          <p class="help">기본은 기준 단가보다 높은 후보를 고릅니다. 규격 검사는 유지하며, 촬영용으로 지지대 개수 검사를 임시 생략합니다.</p>
+          <label><input name="same_direction" type="checkbox"> 방향 수 일치 (선택)</label>
+          <p class="help">기본은 1방향·2방향 차이를 허용합니다. 선택하면 알려진 방향 수도 같아야 합니다.</p>
+          <div class="form-group"><label class="field">가격대 재검색 (%)<input name="band" class="number" type="number" min="0" max="100" value="30" disabled required></label><p>동일단가에서 같은 가격 후보가 하나도 없을 때만 씁니다.</p></div>
+          <p id="upload-name" class="help" hidden></p>
+          <div class="actions"><label class="btn file-btn">품목등록결과.xls로 시작<input id="upload" type="file" accept=".xls"></label><button class="btn primary" id="start" type="submit">수집 시작</button></div>
+        </form>
+        <aside>
+          <h2>검사와 후보 보충 기준</h2>
+          <dl class="rules"><div><dt>규격</dt><dd>가로와 세로 각각 ±10%. 600×150 mm면 가로 540~660, 세로 135~165 mm</dd></div><div><dt>지지대</dt><dd>촬영용 임시 생략. 미확인·개수 차이로 후보를 제외하지 않습니다.</dd></div><div><dt>재질</dt><dd>동일 명칭 → 같은 계열 → 혼합 재질 순으로 우선합니다. 미기재는 확인 필요, 명확히 다른 계열은 제외합니다.</dd></div><div><dt>표시면·설치</dt><dd>미기재는 확인 필요, 명확한 차이는 대안 후보로 표시합니다. 발광·반사 방식도 같습니다.</dd></div><div><dt>선정 순서</dt><dd>조건 충족 후보부터 선정하고 부족하면 확인 필요 → 대안 후보로 보충합니다. 열 배치는 가격 오름차순입니다.</dd></div></dl>
+          <h2 class="section-title">터미널에서 같은 작업</h2><pre id="command"></pre>
+        </aside>
+      </div>
+    </section>
+    <section id="collect" hidden></section>
+    <section id="review" hidden></section>
+    <section id="export" hidden></section>
+    <noscript>작업 생성과 진행 상황 확인을 위해 JavaScript를 활성화하세요.</noscript>
+  </main>
+  <dialog id="supports-dialog" aria-labelledby="supports-title">
+    <form id="supports-form"><h2 id="supports-title">지지대 개수 확인</h2><p class="help">직접 확인한 개수와 근거를 기록하면 해당 품목을 다시 비교합니다. 원천 정보는 보존합니다.</p><label class="field">확인한 개수<input name="count" type="number" min="0" max="100" required></label><label class="field">확인 근거<textarea name="note" required minlength="3" maxlength="1000" placeholder="예: 제조사 규격서 3쪽, 지주 2개 확인"></textarea></label><div class="actions"><button type="button" class="btn" id="close-supports">취소</button><button class="btn primary" type="submit">저장하고 재비교</button></div></form>
+  </dialog>
+  <dialog id="research-dialog" aria-labelledby="research-title">
+    <form id="research-form">
+      <h2 id="research-title">다른 후보 찾기</h2>
+      <p id="research-target" class="help"></p>
+      <p class="help">선택한 후보만 다시 찾습니다. 다른 후보와 기존 가격·규격 조건은 유지합니다.</p>
+      <label class="field">포함할 재질 (선택)<input name="material" maxlength="120" placeholder="예: 스테인리스, SUS304, 목재"></label>
+      <p class="help">비워두면 기존 조건으로 찾습니다. 입력한 재질을 포함하는 혼합 재질도 허용하며, 미확인 재질은 제외합니다.</p>
+      <p class="help">대체 후보가 없으면 기존 후보를 유지합니다. 교체 후 가격순으로 열 위치가 바뀔 수 있습니다.</p>
+      <p id="research-error" role="alert" hidden></p>
+      <div class="actions"><button type="button" class="btn" id="close-research">취소</button><button class="btn primary" type="submit">재검색 요청</button></div>
+    </form>
+  </dialog>
+</body>
+</html>
