@@ -105,9 +105,7 @@ def read_items(in_path):
                    "_detail_attributes":[{"atrbnm":key.removeprefix("(대표)"),
                        "atrbvalue":cell(key),"atrboptnvalue":None} for key in col if cell(key)],
                    "_input_file":str(in_path), "_input_sheet":name, "_input_row":r+1}
-            item = extract(raw)
-            item["모델"] = cell("모델명") or item["모델"]
-            items.append(item)
+            items.append(extract(raw))
         result[name] = items
     return result
 

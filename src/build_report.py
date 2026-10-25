@@ -12,9 +12,8 @@ from openpyxl.drawing.image import Image as XLImage
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-from core.legacy_matching import extract
-from src import matcher
-from src.g2b_client import enrich_product
+from core.comparison import compare
+from src.catalog_provider import LiveProvider
 
 ROWS = ["물품식별번호", "규 격", "모 델 명", "재 질", "용 도", "가 격", "사 진"]
 
@@ -79,19 +78,6 @@ def _add_image(ws, r, col, url, session):
         _put(ws, r, col, "(이미지 실패)")
 
 
-def _match_one(our, top_n, max_pool, exact_price, excl, fallback_band, provider=None, comparison=False):
-    if comparison and provider is None and our.get("_raw"):
-        our = dict(our, **extract(enrich_product(our["_raw"], required=("지지대수",))))
-    if comparison:
-        missing = [key for key in ("규격", "지지대수") if our.get(key) is None]
-        if missing:
-            return dict(our, 비교보류사유="비교 보류: " + ", ".join(missing) + " 미확인"), []
-    return our, matcher.find_candidates(
-        our, keyword=our.get("keyword"), top_n=top_n, max_pool=max_pool,
-        exact_price=exact_price, exclude_companies=excl, fallback_band=fallback_band, provider=provider,
-        comparison=comparison)
-
-
 def prepare_output(out_path: str | Path) -> Path:
     path = Path(out_path).expanduser()
     if path.suffix.lower() != '.xlsx':
@@ -103,10 +89,12 @@ def prepare_output(out_path: str | Path) -> Path:
 
 
 def build(our_items, out_path, top_n=3, our_company="제안업체", exclude_companies=None,
-          max_pool=500, exact_price=False, fallback_band=0.0, provider=None, comparison=False):
+          exact_price=False, fallback_band=0.0, provider=None):
     output = prepare_output(out_path)
     excl = exclude_companies if exclude_companies is not None else [our_company]
-    pairs = [_match_one(it, top_n, max_pool, exact_price, excl, fallback_band, provider, comparison) for it in our_items]
+    source = provider or LiveProvider()
+    pairs = [compare(it, source, top_n=top_n, exact_price=exact_price, fallback_band=fallback_band, excluded=excl)
+             for it in our_items]
     wb = Workbook(); ws = wb.worksheets[0]; ws.title = "가격비교표"
     with requests.Session() as session:
         _render_pairs(ws, our_company, pairs, top_n, session, provider)
@@ -114,16 +102,19 @@ def build(our_items, out_path, top_n=3, our_company="제안업체", exclude_comp
     return out_path
 
 
-def build_multi(companies, out_path, top_n=3, max_pool=500, exact_price=True,
-                exclude_companies=None, fallback_band=0.0, workers=8, provider=None, comparison=False):
-    """{업체명: [our_item...]} → 업체별 시트. 동시(ThreadPool) 매칭 후 렌더. 기본 계열사 상호 제외."""
+def build_multi(companies, out_path, top_n=3, exact_price=True,
+                exclude_companies=None, fallback_band=0.0, workers=8, provider=None):
+    """{업체명: [our_item...]} → 업체별 시트. 동시(ThreadPool) 매칭 후 렌더. 기본 계열사 상호 제외.
+    provider=None이면 실시간 쇼핑몰을 조회하고 사진을 내려받아 삽입한다."""
     output = prepare_output(out_path)
     excl = exclude_companies if exclude_companies is not None else list(companies)
+    source = provider or LiveProvider()
     tasks = [(name, i, it) for name, items in companies.items() for i, it in enumerate(items)]
 
     def work(t):
         name, i, it = t
-        it, cands = _match_one(it, top_n, max_pool, exact_price, excl, fallback_band, provider, comparison)
+        it, cands = compare(it, source, top_n=top_n, exact_price=exact_price,
+                            fallback_band=fallback_band, excluded=excl)
         mark = " (근사)" if cands and cands[0].get("근사") else ""
         print(f"[{name}] {it.get('모델') or it.get('품명')} ({it.get('가격') or 0:,}) → 후보 {len(cands)}개{mark}", flush=True)
         if it.get("비교보류사유"):

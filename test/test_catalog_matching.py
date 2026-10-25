@@ -1,16 +1,17 @@
 import tempfile
 import unittest
+from decimal import Decimal
 from pathlib import Path
 from unittest.mock import patch
 
 from openpyxl import load_workbook
 
-from src import build_report
-from src import matcher
 from core.catalog_partitions import Partition
+from core.catalog_sources import SourceError, get_profile
+from core.comparison import compare
+from src import build_report
 from src.catalog_planner import CollectionPlan
 from src.catalog_provider import SQLiteProvider
-from core.catalog_sources import SourceError, get_profile
 from src.catalog_store import CatalogStore
 from src.g2b_client import parse_search_page
 
@@ -36,7 +37,7 @@ class MatchingTests(unittest.TestCase):
                         "rsltList": [
                             {
                                 "ctrtItemMngNo": "a",
-                                "itemIndfNmView": "ＡＢ 안내판 목재",
+                                "itemIndfNmView": "ＡＢ 안내판 목재, 600×150mm, 지지대 2개",
                                 "ctrtUprc": "110",
                                 "totCnt": 1,
                                 "mnftrEtpsNm": "경쟁사",
@@ -47,7 +48,8 @@ class MatchingTests(unittest.TestCase):
                     profile,
                 ),
             )
-        self.our = {"품명": "안내판", "재질": "목재", "가격": 100}
+        self.our = {"품명": "ＡＢ 안내판 목재", "재질": "목재", "가격": 100,
+                    "규격": (Decimal(600), Decimal(150)), "지지대수": 2}
 
     def test_partial_requires_explicit_allow_and_nfkc_tokens_are_and(self):
         # Given an incomplete diagnostic run.
@@ -68,8 +70,8 @@ class MatchingTests(unittest.TestCase):
             "requests.Session.request", side_effect=AssertionError("network forbidden")
         ):
             # When exact price misses and approximate matching renders a workbook.
-            candidates = matcher.find_candidates(
-                self.our, exact_price=True, fallback_band=0.3, provider=provider
+            _, candidates = compare(
+                self.our, provider, exact_price=True, fallback_band=0.3
             )
             out = self.path / "report.xlsx"
             build_report.build_multi(

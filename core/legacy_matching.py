@@ -1,6 +1,7 @@
 import difflib
 import html
 import re
+import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
@@ -31,7 +32,7 @@ def _to_price(v):
         return 0
 
 
-def _norm_company(name):
+def norm_company(name):
     """업체명 정규화: 법인격·공백 제거 후 소문자. exact 집합 비교용(substring 오제외 방지)."""
     s = str(name or "")
     for t in ("주식회사", "(주)", "㈜", "유한회사", "(유)", "(재)", "(사)"):
@@ -39,6 +40,10 @@ def _norm_company(name):
     return "".join(s.split()).lower()
 WEIGHTS = {"재질": 0.55, "용도": 0.20, "규격": 0.10, "가격": 0.15}
 SPEC_TOL: Final = 0.10
+_DIRECTION_WORDS: Final = {"단방향": 1, "일방향": 1, "양방향": 2, "두방향": 2}
+_DIRECTION_PATTERN: Final = re.compile(r"(?<![0-9a-z.+-])([0-9]+)\s*방향|(?<![a-z])(?:단|일|양|두)\s*방향")
+_FACE_PATTERN: Final = re.compile(
+    r"((?:단|양)\s*면)(?=\s*(?:$|[^가-힣a-z\s]|날개|인쇄|표시|형|아님|아닌|미지원|미포함|불가|제외|지원|이아|은아|는아))")
 
 
 def norm_material(s: str | None) -> str:
@@ -111,14 +116,34 @@ def product_attributes(raw: RawRow) -> AttributeSet:
     return AttributeSet(tuple(values.items()), tuple(sorted(conflicts)))
 
 
+def _normalized_text(text: str) -> str:
+    return unicodedata.normalize("NFKC", html.unescape(text)).casefold()
+
+
+def _count_values(text: str, pattern: re.Pattern[str], words: Mapping[str, int]) -> frozenset[int | None]:
+    """Retain ambiguous evidence instead of treating a negated count as positive."""
+    text = _normalized_text(text)
+    counts: set[int | None] = set()
+    for match in pattern.finditer(text):
+        number = words.get(re.sub(r"\s+", "", match[0]))
+        if number is None:
+            number = int(match[1])
+        suffix = re.sub(r"\s+", "", text[match.end():])
+        negated = re.match(r"(?:안내|표시|인쇄|지원)?(?:이|은|는|가)?(?:아니|아님|불가|미지원|미포함|제외|없음)", suffix)
+        counts.add(number if number > 0 and not negated else None)
+    return frozenset(counts)
+
+
 def direction_count(text: str) -> int | None:
-    match = re.search(r"(?<!\d)(\d+)\s*방향", text)
-    if match:
-        return int(match[1]) or None
-    for word, number in (("단방향", 1), ("일방향", 1), ("양방향", 2), ("두방향", 2)):
-        if word in text.replace(" ", ""):
-            return number
-    return None
+    counts = _count_values(text, _DIRECTION_PATTERN, _DIRECTION_WORDS)
+    return next(iter(counts)) if len(counts) == 1 else None
+
+
+def normalize_use(text: str) -> str:
+    """Normalize known direction-guide syntax without discarding qualifiers."""
+    value = _DIRECTION_PATTERN.sub(
+        lambda match: f"{_DIRECTION_WORDS.get(match[0], match[1])}방향", re.sub(r"\s+", "", _normalized_text(text)))
+    return re.sub(r"^방향안내[/,;·]([0-9]+방향)(?=$|[/,;·])", r"\1안내", value)
 
 
 def support_counts(name: str, attributes: Mapping[str, str]) -> frozenset[int]:
@@ -169,13 +194,16 @@ def extract(raw: RawRow) -> ComparisonItem:
     w, h = _length(width), _length(height)
     dims = (w, h) if w is not None and h is not None else parse_dims(name) or parse_dims(attrs)
     options = values.get("옵션/기타", "")
-    faces = options + " " + name
     circle = re.search(r"[ΦφØø]\s*\d+(?:\.\d+)?\s*mm", name)
     conflicts = set(attributes.conflicts)
-    use_direction, name_direction = direction_count(use), direction_count(name)
-    if use_direction is not None and name_direction is not None and use_direction != name_direction:
+    directions: set[int | None] = set()
+    faces: set[int | None] = set()
+    for text in (use, options, name):
+        directions.update(_count_values(text, _DIRECTION_PATTERN, _DIRECTION_WORDS))
+        faces.update(_count_values(text, _FACE_PATTERN, {"단면": 1, "양면": 2}))
+    if len(directions) > 1:
         conflicts.add("방향수")
-    if "양면" in faces and "단면" in faces:
+    if len(faces) > 1:
         conflicts.add("표시면수")
     supports = support_counts(name, values)
     if len(supports) > 1:
@@ -193,13 +221,13 @@ def extract(raw: RawRow) -> ComparisonItem:
         "재질": norm_material(material),
         "재질원문": material,
         "용도": use,
-        "방향수": direction_count(use + " " + name),
-        "표시면수": 2 if "양면" in faces else 1 if "단면" in faces else None,
+        "방향수": next(iter(directions)) if len(directions) == 1 else None,
+        "표시면수": next(iter(faces)) if len(faces) == 1 else None,
         "지지대수": next(iter(supports)) if len(supports) == 1 else None,
         "속성": values,
         "속성충돌": tuple(sorted(conflicts)),
         "가격": parse_source_row(raw).contract_price_decimal,
-        "모델": _model(name),
+        "모델": values.get("모델명") or _model(name),
         "imgSrc": html.unescape(str(raw.get("imgSrc") or "")),
         "계약구분": str(raw.get("shopCtrtTyNm") or ""),
         "_raw": raw,
@@ -218,7 +246,8 @@ def score(our, cand):
         p["규격"] = 1.0 if d <= SPEC_TOL else max(0.0, 1 - (d - SPEC_TOL))
     else:
         p["규격"] = 0.7
-    p["용도"] = difflib.SequenceMatcher(None, our.get("용도", ""), cand.get("용도", "")).ratio() if our.get("용도") and cand.get("용도") else 0.0
+    left_use, right_use = normalize_use(our.get("용도", "")), normalize_use(cand.get("용도", ""))
+    p["용도"] = difflib.SequenceMatcher(None, left_use, right_use).ratio() if left_use and right_use else 0.0
     op, cp = _to_price(our.get("가격")), _to_price(cand.get("가격"))
     p["가격"] = max(0.0, 1 - abs(op - cp) / op) if op else 0.5
     return sum(WEIGHTS[k] * p[k] for k in WEIGHTS), p

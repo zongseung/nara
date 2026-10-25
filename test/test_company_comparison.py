@@ -191,6 +191,39 @@ class CompanyComparisonTests(unittest.TestCase):
         self.assertEqual(self.out.read_bytes(), b'original')
         self.assertEqual(self.calls, [])
 
+    def test_option_evidence_and_purpose_variants_reach_excel_without_relaxing_constraints(self):
+        self.product_overrides['ours1'] = {
+            'pdctAtrbCdDtlNm': '재질:목재,용도:1방향안내,지지대수:0개',
+            '_detail_attributes': [{'atrbnm': '옵션/기타', 'atrbvalue': '1방향/양면'}]}
+        self.candidates = []
+        for identity, use, option, price in (
+            ('expensive', '방향안내/1방향', '양면', 130),
+            ('cheap', '방향안내／１ 방향', '양면', 110),
+            ('middle', '일방향안내', '양면', 120),
+            ('conflict', '1방향안내', '2방향/양면', 101),
+            ('wrong_face', '1방향안내/단면', '', 102),
+            ('unknown_face', '1방향안내', '', 103),
+            ('wrong_direction', '2방향안내', '양면', 104)):
+            product = self.product(identity, identity)
+            product.update(ctrtUprc=str(price), dscntAplcnUprc='50',
+                           pdctAtrbNm='x$용도$U|x$옵션/기타$O',
+                           pdctAtrbCdDtl=f'Uvalue${use}|Ovalue${option}',
+                           pdctAtrbCdDtlNm='재질:목재,지지대수:0개')
+            self.candidates.append(product)
+        with patch('sys.argv', ['compare_file.py', '--company', '지피코리아', '--limit', '1',
+                                '--workers', '1', '--out', str(self.out)]), redirect_stdout(io.StringIO()):
+            main()
+        with self.out.open('rb') as stream:
+            book = load_workbook(stream)
+            self.addCleanup(book.close)
+            sheet = book.worksheets[0]
+            self.assertEqual([sheet.cell(3, c).value for c in (5, 6, 7)], ['cheap', 'middle', 'expensive'])
+            self.assertEqual([sheet.cell(9, c).value for c in (5, 6, 7)], ['110', '120', '130'])
+            self.assertIn('방향안내／１ 방향', sheet['E8'].value)
+            self.assertIn('1방향/양면', sheet['D8'].value)
+        with ZipFile(self.out) as archive:
+            self.assertEqual(len([name for name in archive.namelist() if name.startswith('xl/media/')]), 4)
+
     def test_missing_output_directories_are_created_and_workbook_is_readable(self):
         self.out = self.out.parent/'nested'/'한글 폴더'/'comparison.XLSX'
         with patch('sys.argv',['compare_file.py','--company','지피코리아','--limit','1',

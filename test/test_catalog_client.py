@@ -204,6 +204,18 @@ class WireTests(unittest.TestCase):
             'srchItemIdnfNo':'12345678','srchItemClsfNo':'55121718',
             'srchCtrtNo':'','srchCtrtChgOrd':'','srchCtrtItemSqno':''}}])
 
+    def test_detail_keeps_input_only_attributes_and_overrides_same_labels(self):
+        self.responses = [(200, json.dumps({'ErrorCode':0,'dlPdctAtrbInfoL':[
+            {'atrbnm':'재질','atrbvalue':'알루미늄','atrboptnvalue':None},
+            {'atrbnm':'지지대수','atrbvalue':'2','atrboptnvalue':None}]}).encode())]
+        raw = {'itemIdnfNm':'안내판, 600×150mm','itemIdnfNo':'12345678','itemClsfNo':'55121718',
+               '_detail_attributes':[{'atrbnm':'모델명','atrbvalue':'GK-ST08','atrboptnvalue':None},
+                                     {'atrbnm':'재질','atrbvalue':'목재','atrboptnvalue':None}]}
+        with patch('src.g2b_client.get_profile', return_value=self.profile):
+            item = extract(enrich_product(raw, required=('지지대수',)))
+        self.assertEqual((item['모델'], item['재질원문'], item['지지대수'], item['속성충돌']),
+                         ('GK-ST08', '알루미늄', 2, ()))
+
     def test_invalid_detail_response_is_not_an_empty_success(self):
         self.responses = [(200, b'{"ErrorCode":0,"dlPdctAtrbInfoL":{}}')]
         with patch('src.g2b_client.get_profile', return_value=self.profile), self.assertRaises(SourceError) as failure:

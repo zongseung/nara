@@ -5,48 +5,16 @@ import sqlite3
 import unicodedata
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from decimal import Decimal
 from pathlib import Path
-from typing import Protocol
 
 from core.catalog_sources import RawRow, SearchQuery, SourceError
+from core.comparison import CandidatePage, RunMetadata
 
 
 def normalized(value: str) -> str:
     return unicodedata.normalize("NFKC", value).casefold()
-
-
-@dataclass(frozen=True, slots=True)
-class RunMetadata:
-    run_id: str
-    scope: str
-    profile_hash: str
-    observed_from: str
-    observed_to: str | None
-    state: str
-    validation: str
-    incomplete: bool
-    source_snapshot_verified: bool = False
-    search_semantics: str = (
-        "Unicode NFKC casefold whitespace-token AND substring; not server-equivalent"
-    )
-
-
-@dataclass(frozen=True, slots=True)
-class CandidatePage:
-    rows: tuple[RawRow, ...]
-    total: int
-    truncated: bool
-    metadata: RunMetadata | None
-
-
-class CandidateProvider(Protocol):
-    def search(
-        self, keyword: str, lower: str = "", upper: str = "", limit: int = 500
-    ) -> CandidatePage: ...
-
-    def enrich(self, raw: RawRow, *, required: tuple[str, ...] = ()) -> RawRow: ...
 
 
 class LiveProvider:

@@ -206,19 +206,19 @@ uv run nara collect --keyword "안내판" --company "지피코리아" \
   → CandidateProvider.search / enrich
       ├─ LiveProvider: 쇼핑몰 검색·필요한 상세 조회
       └─ SQLiteProvider: 지정한 진단 DB 읽기
-  → core 속성·재질·규격 파싱 + src 후보 선정
+  → core 속성·재질·규격 파싱 + 후보 선정(core/comparison.py)
   → build_report: 업체별 Excel·원본 사진 삽입
 ```
 
 | 경로 | 책임 |
 |---|---|
 | `core/legacy_matching.py` | 비교용 DTO, 동적 속성 파싱, 단위·방향·충돌 처리, 점수 |
+| `core/comparison.py` | 기준 품목 비교: 보류 판정, 구성 검사, 상세 보강 조율, 경쟁사 선정. 조회 인터페이스 `CandidateProvider` 정의 |
 | `core/matching/normalization.py` | 재질 명칭·성분·등급 비교와 정규화 |
 | `core/catalog_sources.py` | 소스 범위, 식별자, 쿼리·가격 계약 |
 | `src/transport.py` | 공유 요청 제한과 최대 3회의 HTTP 시도 |
 | `src/g2b_client.py` | 공개 검색 응답·상세 속성 조회 어댑터 |
-| `src/catalog_provider.py` | 실시간·진단 SQLite 조회 인터페이스 |
-| `src/matcher.py` | 구성 검사, 상세 보강 조율, 경쟁사 선정 |
+| `src/catalog_provider.py` | 실시간·진단 SQLite 조회 어댑터 |
 | `src/build_report.py` | Excel 배치·사진·출력 파일 생성 |
 | `src/compare_file.py` | 비교 CLI와 업체별 처리 조율 |
 | `src/format_convert.py` | 기존 XLS 입력·제출 양식 변환 |

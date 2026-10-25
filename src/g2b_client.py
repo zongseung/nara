@@ -177,7 +177,11 @@ def enrich_product(raw: RawRow, *, session: requests.Session | None = None,
             not isinstance(a.get('atrboptnvalue'), (str, type(None)))
             for a in attributes):
         raise SourceError('invalid_detail_response', goods_id, response.attempts, 200)
-    return dict(raw, _detail_attributes=attributes, _detail_checked_at=datetime.now(UTC).isoformat())
+    # 상세 응답에 없는 기존 속성(예: 입력 파일의 모델명 열)은 유지하고, 같은 이름은 상세 응답을 따른다.
+    labels = {attribute['atrbnm'] for attribute in attributes}
+    previous = raw.get('_detail_attributes')
+    kept = [a for a in previous if isinstance(a, dict) and a.get('atrbnm') not in labels] if isinstance(previous, list) else []
+    return dict(raw, _detail_attributes=[*attributes, *kept], _detail_checked_at=datetime.now(UTC).isoformat())
 
 
 def company_catalog(company, *, max_items=None, session=None, delay=0.4):

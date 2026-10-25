@@ -4,7 +4,7 @@
 
 | 구분 | 확인한 동작과 근거 |
 |---|---|
-| 기존 추천 | [`core/legacy_matching.py`](../core/legacy_matching.py)의 가중치는 재질 55%·용도 20%·규격 10%·가격 15%입니다. [`src/matcher.py`](../src/matcher.py)는 동일단가와 자기 업체 제외 조건을 적용하고, 알려진 재질은 기본적으로 동일 재질만 후보로 둡니다. 규격 상대차 허용은 ±35%입니다. 사람이 후보를 검수하는 추천입니다. |
+| 기존 추천 | [`core/legacy_matching.py`](../core/legacy_matching.py)의 가중치는 재질 55%·용도 20%·규격 10%·가격 15%입니다. [`core/comparison.py`](../core/comparison.py)는 동일단가와 자기 업체 제외 조건을 적용하고, 알려진 재질은 동일 재질만 후보로 둡니다. 규격은 각 변 ±10% 이내여야 합니다. 사람이 후보를 검수하는 추천입니다. |
 | 입력 품목군·목적 | [`src/matching/cli.py`](../src/matching/cli.py)와 [`core/matching/contracts.py`](../core/matching/contracts.py)는 `category`와 `purpose`를 명시적으로 받습니다. 목적은 동일 식별(`exact_identity`), 동일단가 경쟁사(`same_price_competitor`), 기능 대체(`functional_substitute`)입니다. 입력 품목군을 학습 모델이 자동 분류하지 않습니다. |
 | 실제 분류번호 | [`src/updater/source.py`](../src/updater/source.py)는 원천 `itemClsfNo`를 `category_id`로 보존합니다. 동봉 정책의 `signage`, `signage_accessory`, `generic_identity`는 초안 식별자이며 실제 분류번호와 검증된 매핑이 없습니다. |
 | 정책 | [`core/matching/policies/`](../core/matching/policies/)에는 signage 3개, signage_accessory 3개, generic identity 1개로 총 7개 JSON 정책이 있으며 모두 `draft`입니다. 업무별 필수 규격·재질·단위·허용오차와 분류 매핑을 검증해야 합니다. |

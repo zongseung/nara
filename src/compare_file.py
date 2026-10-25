@@ -1,7 +1,7 @@
 """
 업체 조회 또는 품목등록결과(.xls) → 구성·규격을 대조한 경쟁사 매칭 → 가격비교표(업체별 시트).
 
-format_convert.read_items 로 .xls를 읽거나 업체 품목을 조회하고 → matcher로 경쟁사를 찾아 →
+format_convert.read_items 로 .xls를 읽거나 업체 품목을 조회하고 → core.comparison으로 경쟁사를 찾아 →
 build_report.build_multi 로 업체별 시트 비교표(경쟁사 이미지 임베드)를 만든다.
 
     python compare_file.py "입력.xls"
@@ -12,7 +12,7 @@ import logging
 import sqlite3
 
 from core.catalog_sources import SearchQuery, SourceError
-from core.legacy_matching import _norm_company, extract
+from core.legacy_matching import extract, norm_company
 from src import build_report, format_convert
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ def main():
     if bool(a.input) == bool(a.company):
         ap.error("input 또는 --company 중 하나를 지정하세요")
     if a.company:
-        normalized = [_norm_company(name) for name in a.company]
+        normalized = [norm_company(name) for name in a.company]
         if not all(normalized) or len(set(normalized)) != len(normalized):
             ap.error("--company는 비어 있거나 중복된 업체명을 사용할 수 없습니다")
         if a.mode != 'suggest' or diagnostic or a.catalog_manifest:
@@ -97,7 +97,7 @@ def main():
             if not a.limit and len(result.items) < result.matched_total:
                 raise SourceError('company_limit_exceeded',f'{requested}: use --limit 10000 for a partial report')
             items = [extract(dict(item.raw)) for item in result.items]
-            items = [item for item in items if _norm_company(item['업체']) == _norm_company(requested)]
+            items = [item for item in items if norm_company(item['업체']) == norm_company(requested)]
             if not items:
                 raise SourceError('company_not_found',requested)
             company = items[0]['업체']
@@ -119,8 +119,7 @@ def main():
     # 입력 파일의 모든 업체(계열사)를 서로 경쟁 풀에서 제외
     build_report.build_multi(companies, a.out, top_n=a.top, exact_price=exact_price,
                              exclude_companies=list(companies),
-                             fallback_band=a.fallback_band, workers=a.workers, provider=provider,
-                             comparison=True)
+                             fallback_band=a.fallback_band, workers=a.workers, provider=provider)
     print("저장:", a.out)
 
 

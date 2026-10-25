@@ -1,7 +1,9 @@
 import unittest
 
 from core.catalog_sources import JsonValue
+from core.comparison import CandidatePage, compare, compatible
 from core.legacy_matching import (
+    direction_count,
     extract,
     missing_product_fields,
     norm_material,
@@ -12,6 +14,107 @@ from core.matching.normalization import material_rank
 
 
 class LegacyMatchingTests(unittest.TestCase):
+    def test_compare_runs_on_an_injected_provider_without_network(self):
+        class Provider:
+            def __init__(self, rows):
+                self.rows, self.searches = rows, []
+
+            def search(self, keyword, lower='', upper='', limit=500):
+                self.searches.append((keyword, lower, upper))
+                return CandidatePage(tuple(self.rows), len(self.rows), False, None)
+
+            def enrich(self, raw, *, required=()):
+                return raw
+
+        def row(identity, company, price, name='안내판, 600×150mm, 지지대 2개'):
+            return {'itemIdnfNo':identity, 'itemIdnfNm':name, 'mnftrEtpsNm':company, 'ctrtUprc':str(price),
+                    '_detail_attributes':[{'atrbnm':'재질', 'atrbvalue':'목재'}]}
+
+        ours = extract(dict(row('ours', '우리', 100), _detail_attributes=[
+            {'atrbnm':'재질', 'atrbvalue':'목재'}, {'atrbnm':'모델명', 'atrbvalue':'GK-ST08'}]))
+        provider = Provider([row('cheap', '경쟁A', 90), row('b', '경쟁B', 130), row('a', '(주)경쟁A', 120),
+                             row('a2', '경쟁A', 125), row('self', '우리', 140),
+                             row('wide', '경쟁C', 110, '안내판, 700×150mm, 지지대 2개')])
+        our, candidates = compare(ours, provider, excluded=['우리'])
+        self.assertEqual(our['모델'], 'GK-ST08')
+        self.assertEqual([c['식별번호'] for c in candidates], ['a', 'b'])
+        self.assertEqual(provider.searches, [('안내판', '100', '')])
+
+        provider.searches.clear()
+        _, approx = compare(ours, provider, exact_price=True, fallback_band=0.3, excluded=['우리'])
+        self.assertEqual([(c['식별번호'], c['근사']) for c in approx], [('a', True), ('b', True)])
+        self.assertEqual(provider.searches, [('안내판', '100', '100'), ('안내판', '70.0', '130.0')])
+
+        provider.searches.clear()
+        held, none = compare(extract(row('x', '우리', 100, '안내판, 600×150mm')), provider)
+        self.assertEqual((held['비교보류사유'], none, provider.searches), ('비교 보류: 지지대수 미확인', [], []))
+
+    def test_direction_and_faces_use_all_three_sources_and_reject_conflicts(self):
+        cases = (
+            ('방향안내', '2방향/양면', '', 2, 2, ()),
+            ('1방향안내/양면', '', '', 1, 2, ()),
+            ('방향안내', '단면2방향', '', 2, 1, ()),
+            ('방향안내', '양면2방향', '', 2, 2, ()),
+            ('1방향안내', '2방향/양면', '', None, 2, ('방향수',)),
+            ('1방향/2방향', '', '', None, None, ('방향수',)),
+            ('단방향/양방향', '', '', None, None, ('방향수',)),
+            ('1방향안내/양면', '단면', '', 1, None, ('표시면수',)),
+            ('방향안내', '２ 방향/양 면', '2방향, 양면', 2, 2, ()),
+            ('방향안내', '양면 아님', '', None, None, ()),
+            ('방향안내', '2방향 미지원', '', None, None, ()),
+            ('방향안내', '양면테이프 부착/양면 테이프/단면도 참조', '', None, None, ()),
+            ('방향안내', '', 'MODEL12 2방향 양면', 2, 2, ()),
+        )
+        for use, option, name, directions, faces, conflicts in cases:
+            with self.subTest(use=use, option=option, name=name):
+                raw = {'itemIdnfNm': f'안내판, AB12, 600×150mm, {name}',
+                       'pdctAtrbNm': 'x$용도$U9|x$옵션/기타$O7',
+                       'pdctAtrbCdDtl': f'U9token${use}|O7token${option}'}
+                item = extract(raw)
+                self.assertEqual(item['방향수'], directions)
+                self.assertEqual(item['표시면수'], faces)
+                self.assertEqual(item['속성충돌'], conflicts)
+                self.assertEqual(item['용도'], use)
+                self.assertEqual(item['속성']['옵션/기타'], option)
+                self.assertIs(item['_raw'], raw)
+
+    def test_direction_count_never_picks_first_of_conflicting_values(self):
+        for text, expected in (('1방향/2방향', None), ('일방향/양방향', None),
+                               ('단방향/1방향', 1), ('２ 방향', 2), ('0방향', None),
+                               ('1.5방향', None), ('A2방향', None), ('2방향 아님', None),
+                               ('MODEL12 2방향', 2), ('단 방향', 1)):
+            with self.subTest(text=text):
+                self.assertEqual(direction_count(text), expected)
+
+    def test_purpose_formatting_is_shared_by_compatibility_and_score(self):
+        base = extract({'itemIdnfNm': '안내판, AB12, 600×150mm',
+                        'pdctAtrbCdDtlNm': '용도:1방향안내,지지대수:0개'})
+        for use in ('방향안내/1방향', '방향안내／１ 방향', '방향안내&#47;1방향', '일방향안내'):
+            with self.subTest(use=use):
+                candidate = dict(base, 용도=use)
+                self.assertTrue(compatible(base, candidate))
+                self.assertEqual(score(base, candidate)[1]['용도'], 1.0)
+                self.assertEqual(candidate['용도'], use)
+        for use in ('2방향안내', '1방향안내 아님', '공원1방향안내', '1방향안내/입간판형',
+                    '1방향안내/2층', '방향안내', '종합안내', ''):
+            with self.subTest(different=use):
+                self.assertFalse(compatible(base, dict(base, 용도=use)))
+
+    def test_options_do_not_invent_supports_or_replace_material_size_or_price(self):
+        for option, supports in (('기둥미포함', 0), ('', None), ('75각 2개', None),
+                                 ('기초포함', None), ('주기둥 STS304', None)):
+            with self.subTest(option=option):
+                raw: dict[str, JsonValue] = {'itemIdnfNm': '안내판, AB12, 600×150mm', 'ctrtUprc': '1430000',
+                       'dscntAplcnUprc': 1287000, 'srchUprc': '1287000',
+                       '_detail_attributes': [
+                           {'atrbnm': '재질', 'atrbvalue': '목재'},
+                           {'atrbnm': '옵션/기타', 'atrbvalue': option + '/전체크기2000×2000mm'}]}
+                item = extract(raw)
+                self.assertEqual(item['지지대수'], supports)
+                self.assertEqual(item['재질원문'], '목재')
+                self.assertEqual(item['규격'], (600, 150))
+                self.assertEqual(item['가격'], 1430000)
+
     def test_material_and_dimensions_keep_normalization(self):
         self.assertEqual(norm_material("SUS"), "스테인리스")
         self.assertEqual(parse_dims("500x450mm"), (500, 450))
