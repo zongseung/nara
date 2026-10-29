@@ -1,14 +1,12 @@
 # nara — 나라장터 품목 수집·가격비교표 생성
 
-현재 촬영용 변경으로 지지대 개수 검사를 임시 중지했습니다. 미확인·개수 차이·지지대 속성 충돌은 후보 탈락 사유가 아니며, 규격·재질·가격 등 나머지 검사는 유지합니다. 아래의 지지대 일치 설명은 정상 운영 정책입니다. 복원은 `core/comparison.py`의 `CHECK_SUPPORTS = True`로 변경한 뒤 API·워커 재시작(컨테이너는 재빌드)이 필요합니다. 기존 보류 작업은 새 수집으로 다시 비교해야 합니다.
+현재 촬영용 변경으로 지지대 개수 검사를 임시 중지했습니다. 미확인·개수 차이·지지대 속성 충돌은 후보 탈락 사유가 아니며, 규격·재질·가격 등 나머지 검사는 유지합니다. 아래의 지지대 일치 설명은 정상 운영 정책입니다. 복원은 `core/comparison.py`의 `CHECK_SUPPORTS = True`로 변경한 뒤 웹 서버 재시작이 필요합니다. 기존 보류 작업은 새 수집으로 다시 비교해야 합니다.
 
-나라장터 종합쇼핑몰의 공개 조회 응답을 받아 업체별 품목을 비교하고, 상품 사진을 포함한 Excel을 만드는 Python CLI입니다. 현재 기본 사용 방식은 **터미널에서 `uv run`으로 실시간 조회 → 파일 저장**입니다. 비교표 생성에는 Docker, 운영 DB, LLM API 키가 필요하지 않습니다.
+나라장터 종합쇼핑몰의 공개 조회 응답을 받아 업체별 품목을 비교하고, 상품 사진을 포함한 Excel을 만드는 Python CLI입니다. 현재 기본 사용 방식은 **터미널에서 `uv run`으로 실시간 조회 → 파일 저장**입니다. 비교표 생성에는 운영 DB나 LLM API 키가 필요하지 않습니다.
 
-웹에서는 **조건 입력 → Prefect 수집 → 후보 검토 → Excel 생성** 순서로 작업할 수 있습니다. Figma Furrow 화면을 바탕으로 만든 FastAPI 웹이며, 비교 결과는 DB 대신 JSON 파일로 보존합니다. 웹 작업에는 Prefect 서버와 프로세스 워커가 필요합니다. 설치·실행·API는 [웹 실행 안내](docs/web-operations.md)를 참고하세요. 기존 CLI는 그대로 사용할 수 있습니다.
+웹에서는 **조건 입력 → 수집 → 후보 검토 → Excel 생성** 순서로 작업할 수 있습니다. Figma Furrow 화면을 바탕으로 만든 FastAPI 웹이며, 비교 결과는 DB 대신 JSON 파일로 보존합니다. 서버 프로세스 하나가 작업을 차례로 실행하므로 별도 서버나 워커가 필요하지 않습니다. 설치·실행·API는 [웹 실행 안내](docs/web-operations.md)를 참고하세요. 기존 CLI는 그대로 사용할 수 있습니다.
 
 검토 화면의 **다른 후보 찾기**는 선택한 경쟁사 후보 한 개만 재검색합니다. 포함할 재질을 선택적으로 입력할 수 있으며, 다른 후보·품목과 기존 가격·규격 조건은 유지합니다. 교체 후 가격순으로 다시 정렬하고 Excel을 재생성하세요.
-
-웹 전체를 Docker로 실행하려면 `docker` 폴더에서 `docker compose -p nara-web-deploy -f compose.web.yaml up -d --build`를 사용합니다. 인증값을 설정한 `.env`가 필요하며 Nginx 진입점은 `http://127.0.0.1:8080`입니다. 품목 응답용 Redis는 Prefect 큐와 분리하고, 작업 파일은 볼륨에 보존합니다.
 
 ## 1. 처음 실행하기
 
@@ -232,7 +230,7 @@ uv run nara collect --keyword "안내판" --company "지피코리아" \
 | `src/compare_file.py` | 비교 CLI와 업체별 처리 조율 |
 | `src/format_convert.py` | 기존 XLS 입력·제출 양식 변환 |
 | `src/live_collection.py` | DB 없는 페이지별 프로세스 수집 |
-| `src/updater/` | 선택형 DB 갱신·이력·게시·Prefect 운영 |
+| `src/updater/` | 선택형 DB 갱신·이력·게시 |
 | `src/matching/` | 별도의 목적별 shadow/auto·학습·평가 운영 |
 | `test/` | 단위·HTTP·CLI·DB·워크북 통합 검증 |
 
@@ -252,7 +250,7 @@ uv run nara collect --keyword "안내판" --company "지피코리아" \
 
 대상 호스트는 `https://shop.g2b.go.kr`입니다. 다른 사이트의 API 키·DB 자격증명을 찾아 저장하는 구조가 아닙니다. 공식 오픈API와는 별개이며 사이트 개편 시 계약 재검증이 필요합니다.
 
-## 7. 선택 기능과 Docker
+## 7. 선택 기능
 
 기본 비교·실시간 수집은 기본 의존성만 사용합니다. 선택 기능은 extra로 지정합니다.
 
@@ -260,7 +258,7 @@ uv run nara collect --keyword "안내판" --company "지피코리아" \
 |---|---|
 | `analytics` | Parquet·DuckDB |
 | `matching` | CPU 모델 학습·평가 |
-| `orchestration` | Prefect·Redis 작업 조율 |
+| `web` | 비교 웹 서버 |
 
 ```sh
 uv run --locked --extra matching nara-match --help
@@ -271,20 +269,7 @@ uv run --locked --extra analytics nara-catalog --help
 
 `shadow`·`auto`에는 게시 manifest, 목적·품목군 정책, 인증된 활성 release와 평가 자료가 필요합니다. `--company` 실시간 모드와 함께 사용할 수 없습니다. `suggest` Excel 생성 성공은 동등성 자동 확정이나 업무 정확도 인증을 뜻하지 않습니다. [자동 매칭 운영 안내](docs/auto-matching-operations.md)를 따릅니다.
 
-DB 발행·이력·예약 갱신이 필요하면 선택형 Docker 스택을 사용합니다. 새 환경은 `docker/.env.example`에서 `docker/.env`를 만들고 해당 비밀번호를 설정합니다. 기존 `.env`와 볼륨을 덮어쓰지 않습니다.
-
-```sh
-docker compose up -d --build
-docker compose ps -a
-docker compose exec -T updater-worker python -m src.updater.cli status --json
-docker compose down
-```
-
-루트 `compose.yaml`이 `docker/compose.yaml`을 포함합니다. Nginx·Prefect·PostgreSQL·Redis·업데이터 등 운영용 구성이며, 접속 주소는 `http://127.0.0.1:4200`입니다. 품목 데이터는 SQLite, PostgreSQL은 Prefect 실행 메타데이터 용도입니다.
-
-**Docker 시작만으로 수집·발행이 완료되지 않습니다.** 원천 수집은 기본 비활성이며 `nara export`는 이미 게시된 운영 카탈로그를 내보내는 명령입니다. 실시간 비교표나 `collect`의 대체 명령이 아닙니다. 최초 운영 발행 전에는 `no_publication`이 정상적으로 발생할 수 있습니다. 수집 활성화·발행·복사 절차는 [Docker 안내](docker/README.md), [업데이터 운영 안내](docs/price-updater-operations.md)를 확인하세요.
-
-이미 `docker/`에서 시작한 스택은 같은 위치·프로젝트 이름을 유지합니다. 루트에서 새로 시작하면 다른 Compose 프로젝트·볼륨을 사용할 수 있습니다.
+DB 발행·이력이 필요하면 `nara refresh`로 수집·게시합니다. 원천 수집은 기본 비활성(`NARA_SOURCE_ENABLED=true`로 허용)이며 예약 실행은 없습니다. 정기 갱신이 필요하면 cron 등 호스트 스케줄러로 이 명령을 실행합니다. `nara export`는 이미 게시된 운영 카탈로그를 내보내는 명령이고, 실시간 비교표나 `collect`의 대체 명령이 아닙니다. 최초 게시 전에는 `no_publication`이 정상적으로 발생할 수 있습니다. 자세한 절차는 [업데이터 운영 안내](docs/price-updater-operations.md)를 확인하세요.
 
 ## 8. 자주 발생하는 문제
 
@@ -300,7 +285,7 @@ docker compose down
 | 이미지 미기재·실패 | 원천 URL 유무·응답·이미지 형식을 확인. 다른 품목 사진으로 대체하지 않음 |
 | `no_publication` | 운영 DB에 첫 발행이 없는 상태. 실시간 업무는 `compare_file.py` 또는 `nara collect` 사용 |
 | 수집 중 건수 변동·중복 오류 | 원천이 조회 도중 변경됐는지 확인하고 새 파일명으로 재실행 |
-| 선택 패키지를 찾지 못함 | 해당 명령에 `--extra matching`, `--extra analytics`, `--extra orchestration` 적용 |
+| 선택 패키지를 찾지 못함 | 해당 명령에 `--extra matching`, `--extra analytics`, `--extra web` 적용 |
 
 ## 9. 검증 명령
 
@@ -318,7 +303,7 @@ uv run --locked python -m unittest \
 uv run --locked --all-extras python -m unittest discover -s test -t . -q
 ```
 
-기본 테스트 실행은 fixture·로컬 HTTP 서버를 사용합니다. Docker 통합 검사는 명시적으로 활성화하는 별도 항목이며 기본 실행에서 건너뛸 수 있습니다. fixture의 통과율을 실제 업무 매칭 정확도로 해석하지 않습니다. 제품 코드에 타입 경고가 남아 있으므로 전체 정적 검사가 경고 없이 통과한다고 주장하지 않습니다.
+기본 테스트 실행은 fixture·로컬 HTTP 서버를 사용합니다. fixture의 통과율을 실제 업무 매칭 정확도로 해석하지 않습니다. 제품 코드에 타입 경고가 남아 있으므로 전체 정적 검사가 경고 없이 통과한다고 주장하지 않습니다.
 
 ## 10. 관련 문서
 
@@ -326,6 +311,6 @@ uv run --locked --all-extras python -m unittest discover -s test -t . -q
 - [진단 DB 수집](docs/catalog-operations.md)
 - [상품정보·가격 갱신](docs/price-updater-operations.md)
 - [shadow/auto·검수·백업](docs/auto-matching-operations.md)
-- [사내망 게이트웨이·운영 자원](docs/gateway-operations.md)
+- [비교 웹 실행](docs/web-operations.md)
 
 기획서는 로컬 `.omo/plans/`, API·재질·방향·이미지 조사 기록은 로컬 `docs/research/`에 보존하며 Git 커밋에서는 제외합니다. 용도 의미 비교 개선 검토안은 `.omo/plans/08-g2b-purpose-semantic-matching.md`에 있습니다. 저장소를 새로 받으면 이 로컬 문서들은 포함되지 않습니다. 현재 기본 CLI 명령과 동작은 이 README와 소스 코드를 기준으로 확인합니다.

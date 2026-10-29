@@ -1,4 +1,4 @@
-"""Read-only operational command line; refresh dispatch belongs to Prefect."""
+"""Operational command line; refresh collects and publishes in this process."""
 import argparse
 import json
 import logging
@@ -21,7 +21,6 @@ class StatusReport(TypedDict, total=False):
     information_groups: dict[str,dict[str,str|bool|None]]
     last_successful_refresh_at: str
     source_enabled: bool
-    dispatch_enabled: bool
     collection_progress: dict[str, int | str]
 
 
@@ -36,7 +35,6 @@ def main() -> None:
     commands.add_parser('current')
     refresh = commands.add_parser('refresh')
     refresh.add_argument('--mode',choices=['full'],default='full')
-    refresh.add_argument('--retry-slot')
     history = commands.add_parser('history')
     history.add_argument('listing_key')
     history.add_argument('--price-only', action='store_true')
@@ -46,7 +44,7 @@ def main() -> None:
     sample = commands.add_parser('sample', help='Export a bounded live test sample without publishing to the operational store.')
     sample.add_argument('--limit', type=int, default=100, metavar='1..1000')
     sample.add_argument('--out', type=Path, required=True)
-    collect = commands.add_parser('collect', help='Collect live pages in separate processes without a database or Docker.')
+    collect = commands.add_parser('collect', help='Collect live pages in separate processes without a database.')
     collect.add_argument('--keyword', default='')
     collect.add_argument('--company', default='')
     collect.add_argument('--min-price', default='')
@@ -79,25 +77,25 @@ def main() -> None:
     store = Store(args.data_dir)
     if args.command == 'refresh':
         if os.environ.get('NARA_SOURCE_ENABLED') != 'true':
-            parser.exit(2, 'production_source_not_enabled: Set NARA_SOURCE_ENABLED=true in docker/.env '
-                        + 'and recreate updater-worker before submitting a refresh.\n')
-        from datetime import datetime, timezone
-        from src.updater.dispatcher import ensure_slot, submit_pending
-        key = args.retry_slot or ensure_slot(store,datetime.now(timezone.utc),manual=True)
-        if args.retry_slot:
-            from src.updater.dispatcher import require_available
-            from prefect.client.orchestration import get_client
-            from src.updater.dispatcher import DEPLOYMENT_NAME
-            from uuid import uuid4
-            from src.updater.locks import file_lock
-            with file_lock(store.path('locks/maintenance.lock'),shared=True):
-                require_available(store)
-                with get_client(sync_client=True) as client:
-                    deployment=client.read_deployment_by_name(DEPLOYMENT_NAME)
-                    run=client.create_flow_run_from_deployment(deployment.id,parameters=dict(slot_key=key),idempotency_key='manual-retry-'+uuid4().hex)
-                    print(json.dumps(dict(slot_key=key,prefect_run_id=str(run.id))))
-        else:
-            print(json.dumps(dict(slot_key=key,prefect_run_id=submit_pending(store,key))))
+            parser.exit(2, 'production_source_not_enabled: Set NARA_SOURCE_ENABLED=true to collect from the live source.\n')
+        from decimal import Decimal
+        from core.catalog_partitions import PriceDomain
+        from src.updater import collector
+        from src.updater.locks import file_lock, maintenance_active
+        from src.updater.source import ShoppingSource
+        domain = None
+        if os.environ.get('NARA_PRICE_DOMAIN_JSON'):
+            settings = json.loads(os.environ['NARA_PRICE_DOMAIN_JSON'])
+            domain = PriceDomain(Decimal(settings['lower']), Decimal(settings['upper']), Decimal(settings['quantum']), int(settings['max_partition_rows']))
+        try:
+            with file_lock(store.path('locks/maintenance.lock'), shared=True):
+                if maintenance_active(store.path('')):
+                    raise StoreError('maintenance_active')
+                manifest = collector.refresh(store, ShoppingSource(), policy=collector.CollectionPolicy(domain=domain, allow_deep_pages=domain is None, network_workers=4))
+        except (StoreError, SourceError, OSError) as error:
+            parser.exit(2, f'{error}\n')
+        print(json.dumps(dict(status='published', run_id=manifest.publication_id, catalog_generation=manifest.catalog_generation,
+                              observed_from=manifest.observed_from, observed_to=manifest.observed_to, published_at=manifest.published_at)))
         return
     if args.command == 'status':
         with store.control() as conn:
@@ -105,8 +103,7 @@ def main() -> None:
         from src.updater.maintenance import freshness
         from src.updater.locks import maintenance_active
         report: StatusReport=StatusReport(runs=runs,maintenance=maintenance_active(store.path('')),
-                                         source_enabled=os.environ.get('NARA_SOURCE_ENABLED')=='true',
-                                         dispatch_enabled=os.environ.get('NARA_DISPATCH_ENABLED')=='true')
+                                         source_enabled=os.environ.get('NARA_SOURCE_ENABLED')=='true')
         if runs:
             stage=store.path(f"stage/{runs[-1]['run_id']}.sqlite")
             if stage.is_file():
@@ -139,7 +136,7 @@ def main() -> None:
         parser.exit(2, 'no_publication: No published catalog is available.\n'
                     + 'Run status --json to check collection progress.\n'
                     + 'Complete the first source refresh and publication before reading or exporting.\n'
-                    + 'Docker startup does not collect data; source access is disabled by default.\n')
+                    + 'Source access is disabled by default.\n')
     if args.command == 'catalog-manifest':
         args.out.write_text(manifest.model_dump_json(indent=2))
         return

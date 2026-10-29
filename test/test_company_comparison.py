@@ -14,7 +14,7 @@ from openpyxl import load_workbook
 from PIL import Image
 
 from core.catalog_sources import SourceError, get_profile
-from src.build_report import build
+from src.build_report import render_multi
 from src.compare_file import main
 from src.transport import RequestLimiter
 from test.updater_fixtures import row
@@ -269,12 +269,12 @@ class CompanyComparisonTests(unittest.TestCase):
 
     def test_python_builder_creates_output_directory_and_preserves_existing_file(self):
         output = self.out.parent/'nested'/'comparison.xlsx'
-        build([], output)
+        render_multi({'업체': []}, output)
         book = load_workbook(output)
         book.close()
         original = output.read_bytes()
         with self.assertRaises(FileExistsError):
-            build([], output)
+            render_multi({'업체': []}, output)
         self.assertEqual(output.read_bytes(), original)
 
     @patch('core.comparison.CHECK_SUPPORTS', True)

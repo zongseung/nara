@@ -88,20 +88,6 @@ def prepare_output(out_path: str | Path) -> Path:
     return path
 
 
-def build(our_items, out_path, top_n=3, our_company="제안업체", exclude_companies=None,
-          exact_price=False, fallback_band=0.0, provider=None):
-    output = prepare_output(out_path)
-    excl = exclude_companies if exclude_companies is not None else [our_company]
-    source = provider or LiveProvider()
-    pairs = [compare(it, source, top_n=top_n, exact_price=exact_price, fallback_band=fallback_band, excluded=excl)
-             for it in our_items]
-    wb = Workbook(); ws = wb.worksheets[0]; ws.title = "가격비교표"
-    with requests.Session() as session:
-        _render_pairs(ws, our_company, pairs, top_n, session, provider)
-        _save(wb, output)
-    return out_path
-
-
 def build_multi(companies, out_path, top_n=3, exact_price=True,
                 exclude_companies=None, fallback_band=0.0, workers=8, provider=None, same_direction=False):
     """{업체명: [our_item...]} → 업체별 시트. 동시(ThreadPool) 매칭 후 렌더. 기본 계열사 상호 제외.

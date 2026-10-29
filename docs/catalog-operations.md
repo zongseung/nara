@@ -69,7 +69,7 @@ Preflight requires at least 1 GiB free and a conservative estimate of 8 KiB per 
 | 4 | Unsupported scope, missing credentials or unvalidated source contract |
 | 1 | Other failure |
 
-`crawl_all.py` now forwards to diagnostic `crawl` with default `catalog_v2.db`. Its imported legacy price-window helpers remain for old direct tests; the CLI does not write old `items`/`done` tables. Never pass the old `shop_all.db` as a diagnostic writer destination: the schema is rejected without mutation. The old normalized rows cannot reconstruct discarded original fields or missing contract identities; legacy done flags cannot prove a new observation is current.
+`crawl_all.py` now forwards to diagnostic `crawl` with default `catalog_v2.db`. The CLI does not write old `items`/`done` tables. Never pass the old `shop_all.db` as a diagnostic writer destination: the schema is rejected without mutation. The old normalized rows cannot reconstruct discarded original fields or missing contract identities; legacy done flags cannot prove a new observation is current.
 
 Keep the old DB until the new sidecar is verified. Roll back consumers by selecting a prior reconciled run explicitly or the preserved old export. Failed diagnostic runs do not replace the last published pointer or delete missing products. There is no implicit operational promotion or destructive migration.
 

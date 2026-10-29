@@ -97,7 +97,29 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(status.returncode, 0, status.stderr)
         self.assertEqual(json.loads(status.stdout)['freshness']['status'], 'unpublished')
 
-    def test_cli_refresh_disabled_does_not_enqueue(self):
+    def test_cli_refresh_publishes_in_process_unless_maintenance(self):
+        from contextlib import redirect_stderr, redirect_stdout
+        from io import StringIO
+        from unittest.mock import patch
+        from src.updater.cli import main
+        from src.updater.reader import catalog_manifest
+        output, errors = StringIO(), StringIO()
+        with patch('sys.argv', ['cli', '--data-dir', str(self.store.root), 'refresh']), \
+                patch.dict(os.environ, {'NARA_SOURCE_ENABLED': 'true'}), \
+                patch('src.updater.source.ShoppingSource', return_value=FixtureSource([row()])), \
+                redirect_stdout(output), redirect_stderr(errors):
+            self.store.path('control/maintenance.flag').write_text('now')
+            with self.assertRaises(SystemExit):
+                main()
+            self.assertIn('maintenance_active', errors.getvalue())
+            with self.store.control() as conn:
+                self.assertEqual(conn.execute('SELECT count(*) FROM runs').fetchone()[0], 0)
+            self.store.path('control/maintenance.flag').unlink()
+            main()
+        self.assertEqual(json.loads(output.getvalue())['status'], 'published')
+        self.assertEqual(catalog_manifest(self.store).environment, 'production')
+
+    def test_cli_refresh_disabled_does_not_collect(self):
         result = subprocess.run([sys.executable, '-m', 'src.updater.cli', '--data-dir',
                                  str(self.store.root), 'refresh'], capture_output=True, text=True,
                                 env=os.environ | {'NARA_SOURCE_ENABLED': 'false'})

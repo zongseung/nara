@@ -1,5 +1,6 @@
 import io
 import tempfile
+import threading
 import unittest
 from decimal import Decimal
 from pathlib import Path
@@ -64,6 +65,24 @@ class WebJobsTests(unittest.TestCase):
         self.assertEqual(self.store.read(job_id).status, 'queued')
         self.assertEqual(len(self.sent), 1)
         self.assertFalse((self.root/job_id/'catalog.sqlite').exists())
+
+    def test_collection_compares_items_concurrently(self):
+        barrier, seen = threading.Barrier(2, timeout=5), set()
+
+        class Concurrent(Provider):
+            def search(self, keyword, lower='', upper='', limit=500):
+                if threading.get_ident() not in seen:
+                    seen.add(threading.get_ident())
+                    barrier.wait()
+                return super().search(keyword, lower, upper, limit)
+
+        job_id = self.create()
+        execute(self.root, job_id, self.store.read(job_id).operation_id, provider=Concurrent(),
+                collect=lambda request: {'기준회사': [product('10000000', '기준회사', 100),
+                                                     product('10000001', '기준회사', 100)]})
+        self.assertEqual(self.store.read(job_id).status, 'review')
+        self.assertEqual([item.index for item in self.store.items(job_id)], [0, 1])
+        self.assertTrue(all(item.candidates for item in self.store.items(job_id)))
 
     def test_research_replaces_only_requested_candidate_and_remembers_rejections(self):
         job_id = self.create()
@@ -383,16 +402,6 @@ class WebJobsTests(unittest.TestCase):
         self.assertEqual(response.status_code, 202)
         self.assertNotEqual(response.json()['operation_id'], operation)
 
-    def test_broker_outage_keeps_job_for_retry(self):
-        def offline(job_id, operation_id):
-            raise requests.ConnectionError('fixture broker offline')
-        client = TestClient(create_app(self.root, submit=offline))
-        response = client.post('/jobs', json={'company': '기준회사'})
-        self.assertEqual(response.status_code, 503)
-        job_id = response.json()['detail']['job_id']
-        self.assertEqual(self.store.read(job_id).status, 'queued')
-        self.assertEqual(self.client.post(f'/jobs/{job_id}/retry').status_code, 202)
-
     def test_invalid_upload_and_unknown_job_are_rejected(self):
         self.assertEqual(self.client.post('/jobs/upload', content=b'not an xls').status_code, 422)
         self.assertEqual(self.client.get('/jobs/00000000-0000-0000-0000-000000000000/items').status_code, 404)
@@ -407,12 +416,19 @@ class WebJobsTests(unittest.TestCase):
                 collect=lambda request: {'기준회사': [original]})
         self.assertEqual(JobStore(self.root).items(job_id)[0].reference['가격'], Decimal('123456789012345678.1234'))
 
-    def test_prefect_crash_changes_stuck_job_to_retryable_failure(self):
-        job_id = self.create()
-        self.store.update(job_id, lambda job: job.model_copy(update={'flow_run_id': 'test-flow'}))
-        with patch('src.web.dispatch.prefect_client') as client:
-            client.return_value.__enter__.return_value.get.return_value.json.return_value = {'state_type': 'CRASHED'}
-            self.assertEqual(self.client.get(f'/jobs/{job_id}').json()['status'], 'failed')
+    def test_restart_marks_unfinished_jobs_retryable(self):
+        queued, running, done = self.create(), self.create(), self.create()
+        self.store.update(running, lambda job: job.model_copy(update={'status': 'running'}))
+        self.collect(done)
+        path = self.root/queued/'job.json'
+        path.write_text(path.read_text()[:-1]+', "flow_run_id": "old-flow"}')
+        self.assertEqual(self.client.post(f'/jobs/{queued}/retry').status_code, 409)
+        with TestClient(create_app(self.root, submit=lambda j, o: self.sent.append((j, o)))) as client:
+            self.assertEqual([client.get(f'/jobs/{i}').json()['status'] for i in (queued, running, done)],
+                             ['failed', 'failed', 'review'])
+            self.assertIn('재시도', self.store.read(running).message)
+            self.assertEqual(client.post(f'/jobs/{queued}/retry').status_code, 202)
+        self.assertEqual(self.sent[-1], (queued, self.store.read(queued).operation_id))
 
 
 if __name__ == '__main__':

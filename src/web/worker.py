@@ -1,4 +1,6 @@
+import logging
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from core.catalog_sources import SearchQuery, SourceError
@@ -13,6 +15,8 @@ from src.web.models import Event, Job, JobRequest, ReviewItem
 from src.web.store import JobStore
 
 Companies = dict[str, list[ComparisonItem]]
+WORKERS = 8  # build_multi와 같은 품목 동시 처리 수
+logger = logging.getLogger(__name__)
 
 
 class Cancelled(Exception):
@@ -61,6 +65,19 @@ def _compare_item(store: JobStore, job: Job, item: ReviewItem, provider: Candida
     store.save_item(job.id, item.model_copy(update={'reference': reference, 'candidates': candidates, 'excluded': []}))
     _progress(store, job, 'item_completed', reference.get('비교보류사유') or f'후보 {len(candidates)}개 선정', item.index)
     store.update(job.id, lambda current: current.model_copy(update={'completed': current.completed+1}))
+
+
+def _compare_all(store: JobStore, job: Job, items: list[ReviewItem], provider: CandidateProvider,
+                 excluded: list[str]) -> None:
+    # 응답을 기다리는 동안 다른 품목이 요청을 보낸다. 요청 시작 간격은 공유 limiter가 초당 1건으로 유지한다.
+    with ThreadPoolExecutor(max_workers=WORKERS) as pool:
+        futures = [pool.submit(_compare_item, store, job, item, provider, excluded) for item in items]
+        try:
+            for future in futures:
+                future.result()
+        except BaseException:
+            pool.shutdown(cancel_futures=True)
+            raise
 
 
 def _research_item(store: JobStore, job: Job, provider: CandidateProvider) -> str:
@@ -126,13 +143,11 @@ def execute(root: Path, job_id: str, operation_id: str, *, provider: CandidatePr
                     store.restart_items(job_id, operation_id)
                     store.update(job_id, lambda current: current.model_copy(update={
                         'total': total, 'partial': bool(job.request.limit)}))
-                    index = 0
-                    for company, items in companies.items():
-                        for reference in items:
-                            item = ReviewItem(index=index, company=company, reference=reference)
-                            store.save_item(job_id, item)
-                            _compare_item(store, job, item, source, list(companies))
-                            index += 1
+                    pending = [ReviewItem(index=index, company=company, reference=reference) for index, (company, reference)
+                               in enumerate((company, reference) for company, items in companies.items() for reference in items)]
+                    for item in pending:
+                        store.save_item(job_id, item)
+                    _compare_all(store, job, pending, source, list(companies))
                 case 'rematch':
                     if job.item_index is None:
                         raise SourceError('missing_item_index')
@@ -164,4 +179,5 @@ def execute(root: Path, job_id: str, operation_id: str, *, provider: CandidatePr
             store.update(job_id, lambda current: current.model_copy(update={
                 'status': 'failed', 'stage': 'failed', 'error': error_name,
                 'message': f'작업 실패: {message}'}))
+            logger.exception('작업 실패 | %s', job_id)  # 실행 스레드의 Future가 예외를 삼키므로 여기서 남긴다.
             raise

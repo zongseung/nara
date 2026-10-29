@@ -164,8 +164,4 @@ def publish(store: Store, lease: Lease) -> 'Manifest':
         conn.execute('INSERT INTO publication_events VALUES (?,?,?,?)', (lease.run_id, lease.profile.profile_hash, generation, manifest.model_dump_json()))
         conn.execute('INSERT INTO publications VALUES (?,?,?) ON CONFLICT(profile_hash) DO UPDATE SET run_id=excluded.run_id,generation=excluded.generation', (lease.profile.profile_hash, lease.run_id, generation))
         conn.execute("UPDATE runs SET status='published',finished_at=? WHERE run_id=?", (manifest.published_at, lease.run_id))
-        if lease.slot_key is not None:
-            changed = conn.execute("UPDATE scheduled_slots SET status='published',reason=NULL WHERE slot_key=? AND business_run_id=? AND status='running'", (lease.slot_key,lease.run_id)).rowcount
-            if changed != 1:
-                raise StoreError('slot_publication_conflict')
     return manifest

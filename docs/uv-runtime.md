@@ -1,6 +1,6 @@
 # 터미널 실행 환경
 
-Python 3.12와 uv를 사용한다. 저장소 루트의 `pyproject.toml`은 직접 의존성, `uv.lock`은 설치 버전과 패키지 해시를 고정한다. 현재는 DB 구축을 미루고 사이트를 직접 조회해 파일로 저장한다. Docker와 Prefect는 이 흐름에 필요하지 않다.
+Python 3.12와 uv를 사용한다. 저장소 루트의 `pyproject.toml`은 직접 의존성, `uv.lock`은 설치 버전과 패키지 해시를 고정한다. 현재는 DB 구축을 미루고 사이트를 직접 조회해 파일로 저장한다.
 
 저장소 루트에서 설치하고 실행한다. `.venv`를 수동 생성하거나 활성화할 필요는 없다.
 
@@ -73,7 +73,7 @@ XLSX는 `수집정보`, `실시간품목` 시트로 구성된다. JSONL 첫 줄�
 |---|---|
 | `analytics` | Parquet·DuckDB |
 | `matching` | CPU 모델 학습·평가 |
-| `orchestration` | Prefect·Redis를 통한 기존 작업 조율 |
+| `web` | 비교 웹 서버 |
 
 ```sh
 uv sync --locked --all-extras
@@ -82,4 +82,4 @@ uv run --all-extras nara-catalog --help
 uv run --all-extras python -m unittest discover -s test -t . -q
 ```
 
-기존 DB 운영 기능을 선택하면 품목 저장소는 `sqlite3` 기반 SQLite 파일이고 Docker PostgreSQL은 Prefect 메타데이터 저장소이다. 기존 `refresh`는 `orchestration` extra와 Prefect 서비스가 필요한 별도 경로다. `collect`는 이 경로를 실행하지 않으며 DB 생성·이전·운영 데이터 마이그레이션을 수행하지 않는다. 기존 Docker 구성과 볼륨은 이후 운영 방식을 정할 때 사용할 수 있도록 유지한다.
+기존 DB 운영 기능을 선택하면 품목 저장소는 `sqlite3` 기반 SQLite 파일이다. `refresh`는 같은 프로세스에서 수집·검증·게시까지 수행하는 별도 경로다. `collect`는 이 경로를 실행하지 않으며 DB 생성·이전·운영 데이터 마이그레이션을 수행하지 않는다.
