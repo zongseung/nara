@@ -80,6 +80,7 @@ class ReviewItem(Model):
 
 
 class Job(Model):
+    model_config = ConfigDict(extra='ignore')  # 이전 job.json의 flow_run_id 등 제거된 필드는 무시한다.
     id: str = Field(default_factory=lambda: str(uuid4()))
     request: JobRequest
     status: Literal['queued', 'running', 'review', 'exported', 'failed', 'cancelled'] = 'queued'
@@ -99,7 +100,6 @@ class Job(Model):
     partial: bool = False
     cancel_requested: bool = False
     workbook: str | None = None
-    flow_run_id: str | None = None
 
 
 class Event(Model):

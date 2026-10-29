@@ -1,23 +1,15 @@
 import os
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
 from uuid import UUID
 
-import requests
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from src.web.cache import ItemCache
-from src.web.dispatch import (
-    Submit,
-    enqueue,
-    next_operation,
-    reconcile,
-    root_path,
-    submit,
-)
+from src.web.dispatch import Submit, next_operation, root_path
 from src.web.models import (
     Event,
     Job,
@@ -29,18 +21,24 @@ from src.web.models import (
     SupportReview,
 )
 from src.web.store import JobConflict, JobStore, require_review
+from src.web.worker import execute
 
 
-def create_app(root: Path | None = None, *, submit: Submit = submit) -> FastAPI:
+def create_app(root: Path | None = None, *, submit: Submit | None = None) -> FastAPI:
     store = JobStore(root or root_path())
-    cache = ItemCache()
+    executor = ThreadPoolExecutor(max_workers=1)  # 원천 요청 제한(초당 1건)이 프로세스 단위라 작업은 하나씩 실행한다.
+    run = submit or (lambda job_id, operation_id: executor.submit(execute, store.root, job_id, operation_id))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        for path in store.root.glob('*/job.json'):  # 이전 프로세스의 대기·진행 작업은 다시 실행되지 않는다.
+            if Job.model_validate_json(path.read_bytes()).status in ('queued', 'running'):
+                store.update(path.parent.name, lambda job: job.model_copy(update={'status': 'failed', 'stage': 'failed',
+                    'message': '서버가 다시 시작되어 작업이 중단되었습니다. 작업을 재시도하세요.'}))
         try:
             yield
         finally:
-            cache.close()
+            executor.shutdown(wait=False, cancel_futures=True)
 
     app = FastAPI(title='nara 비교 API', version='0.1.0', lifespan=lifespan)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=os.environ.get(
@@ -70,10 +68,8 @@ def create_app(root: Path | None = None, *, submit: Submit = submit) -> FastAPI:
         return JSONResponse({'detail': '작업 또는 품목을 찾을 수 없습니다.'}, status_code=404)
 
     def send(job: Job) -> Job:
-        try:
-            return enqueue(store, job, submit)
-        except requests.RequestException:
-            raise HTTPException(503, detail={'job_id': job.id, 'message': 'Prefect 연결 실패. 작업 제출을 다시 시도하세요.'}) from None
+        run(job.id, job.operation_id)
+        return job
 
     @app.get('/health')
     def health():
@@ -93,7 +89,6 @@ def create_app(root: Path | None = None, *, submit: Submit = submit) -> FastAPI:
     async def upload_job(request: Request, limit: int = 0, top: int = 3, exact_price: bool = False,
                          fallback_band: float = 0, same_direction: bool = False):
         from pydantic import ValidationError
-        from starlette.concurrency import run_in_threadpool
         try:
             settings = JobRequest(limit=limit, top=top, exact_price=exact_price,
                                   fallback_band=fallback_band, same_direction=same_direction)
@@ -106,25 +101,16 @@ def create_app(root: Path | None = None, *, submit: Submit = submit) -> FastAPI:
                 raise HTTPException(413, '입력 파일은 최대 8MB입니다.')
         if not content.startswith(bytes.fromhex('D0CF11E0A1B11AE1')):
             raise HTTPException(422, '품목등록결과 .xls 파일을 선택하세요.')
-        job = store.create(settings, bytes(content))
-        return await run_in_threadpool(send, job)
+        return send(store.create(settings, bytes(content)))
 
     @app.get('/jobs/{job_id}')
     def get_job(job_id: UUID):
-        return reconcile(store, store.read(str(job_id)))
+        return store.read(str(job_id))
 
     @app.get('/jobs/{job_id}/items')
     def get_items(job_id: UUID):
-        job = store.read(str(job_id))
-        key = f'nara:items:v1:{job.id}:{job.operation_id}:{job.revision}:{job.updated_at}'
-        body = cache.get(key)
-        hit = body is not None
-        if body is None:
-            body = bytes(JSONResponse([item.model_dump(mode='json', exclude={
-                'reference': {'_raw'}, 'candidates': {'__all__': {'_raw'}}})
-                for item in store.items(job.id)]).body)
-            cache.put(key, body)
-        return Response(body, media_type='application/json', headers={'X-Cache': 'HIT' if hit else 'MISS'})
+        return [item.model_dump(mode='json', exclude={'reference': {'_raw'}, 'candidates': {'__all__': {'_raw'}}})
+                for item in store.items(store.read(str(job_id)).id)]
 
     @app.get('/jobs/{job_id}/events')
     def get_events(job_id: UUID):
@@ -193,10 +179,8 @@ def create_app(root: Path | None = None, *, submit: Submit = submit) -> FastAPI:
     @app.post('/jobs/{job_id}/retry', status_code=202)
     def retry(job_id: UUID):
         def change(job: Job) -> Job:
-            if job.status == 'queued':
-                return job
             if job.status not in ('failed', 'cancelled'):
-                raise JobConflict('대기·실패·중지 상태의 작업만 재시도할 수 있습니다.')
+                raise JobConflict('실패·중지 상태의 작업만 재시도할 수 있습니다.')
             return next_operation(job, job.operation, job.item_index)
         return send(store.update(str(job_id), change))
 
