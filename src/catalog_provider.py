@@ -105,6 +105,11 @@ class SQLiteProvider:
                 (self.metadata.run_id,),
             )
             for row in rows:
+                # Price comes from its own column, so rows outside the band skip JSON parsing.
+                if (lower or upper) and (row["price"] is None or
+                        (lower and Decimal(row["price"]) < Decimal(lower)) or
+                        (upper and Decimal(row["price"]) > Decimal(upper))):
+                    continue
                 raw = json.loads(row["raw_json"], parse_float=Decimal)
                 haystack = normalized(
                     " ".join(
@@ -118,10 +123,6 @@ class SQLiteProvider:
                     )
                 )
                 if not all(t in haystack for t in tokens):
-                    continue
-                if (lower or upper) and (row["price"] is None or
-                        (lower and Decimal(row["price"]) < Decimal(lower)) or
-                        (upper and Decimal(row["price"]) > Decimal(upper))):
                     continue
                 total += 1
                 if len(selected) < limit:

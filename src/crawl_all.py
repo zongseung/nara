@@ -1,32 +1,10 @@
-"""Diagnostic collection entry point and retained legacy partition-test helpers."""
+"""Diagnostic collection entry point."""
 
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 
-from src import g2b_client as g2b
 from src.catalog_client import Source
 from src.catalog_store import CatalogStore
-
-SAFE = 9000  # 윈도우당 상한(≈90페이지). 넘으면 반으로 분할.
-
-
-def count(session, lo, hi):
-    """가격구간 [lo, hi]의 총건수."""
-    _, tot = g2b.fetch_page(1, page_size=1, start_prce=lo, end_prce=hi, session=session)
-    return tot
-
-
-def plan_windows(session, lo, hi, out):
-    """[lo,hi]를 건수 SAFE 이하 리프 구간들로 적응 분할해 out에 (lo,hi,tot)로 append."""
-    tot = count(session, lo, hi)
-    if tot == 0:
-        return
-    if tot <= SAFE or lo >= hi:
-        out.append((lo, hi, tot))
-        return
-    mid = (lo + hi) // 2
-    plan_windows(session, lo, mid, out)
-    plan_windows(session, mid + 1, hi, out)
 
 
 def collect(

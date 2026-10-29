@@ -1,17 +1,17 @@
 import json
 import threading
 import unittest
+from dataclasses import replace
+from decimal import Decimal
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from unittest.mock import patch
 
 import requests
-from dataclasses import replace
-from decimal import Decimal
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from core.catalog_sources import SearchQuery, SourceError, get_profile
-from src.g2b_client import enrich_product, fetch_page, fetch_search_page, parse_search_page
 from core.legacy_matching import extract
+from src.g2b_client import enrich_product, fetch_search_page, parse_search_page
 
 
 class ClientTests(unittest.TestCase):
@@ -141,12 +141,6 @@ class WireTests(unittest.TestCase):
             with self.assertRaises(SourceError) as failure:
                 fetch_search_page(SearchQuery(), self.profile, session=session)
         self.assertEqual((failure.exception.code, len(self.requests)), ('nested_retries', 0))
-
-    def test_legacy_tuple_preserves_raw_rows_and_row_count(self):
-        self.responses = [(200, b'{"totalSize":2,"rsltList":[{"totCnt":1,"ctrtUprc":null,"extra":"kept"}]}')]
-        with patch('src.g2b_client.get_profile', return_value=self.profile):
-            rows, count = fetch_page(1)
-        self.assertEqual((rows[0]['ctrtUprc'], rows[0]['extra'], count), (None, 'kept', 1))
 
     def test_business_error_is_not_retried_or_treated_as_empty(self):
         self.responses = [(200, b'{"ErrorCode":99,"totalSize":0,"rsltList":[]}')]

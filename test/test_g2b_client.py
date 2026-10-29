@@ -1,11 +1,14 @@
 """
-ponytail 자체검증: 실제 응답에서 캡처한 원본 레코드로 _normalize()를 검증한다.
-필드 매핑(특히 MAS여부/계약구분/계약번호/단가)이 깨지면 여기서 바로 실패한다. 네트워크 불필요.
+ponytail 자체검증: 실제 응답에서 캡처한 원본 레코드를 parse_search_page → extract로 검증한다.
+필드 매핑(특히 계약구분/단가/세부품명)이 깨지면 여기서 바로 실패한다. 네트워크 불필요.
   실행:  python -m unittest test.test_g2b_client
 """
 import unittest
+from decimal import Decimal
 
-from src import g2b_client as g2b
+from core.catalog_sources import get_profile
+from core.legacy_matching import extract
+from src.g2b_client import parse_search_page
 
 # shop.g2b.go.kr newShopUntySrchApi.do 응답 rsltList[0] 실측 발췌 (안내판 검색 첫 결과)
 SAMPLE = {
@@ -34,22 +37,14 @@ SAMPLE = {
 
 
 class G2BClientTests(unittest.TestCase):
-    def test_normalize(self):
-        r = g2b._normalize(SAMPLE)
-        assert r["계약단가"] == 17990 and isinstance(r["계약단가"], int), r["계약단가"]
-        assert r["MAS여부"] == "Y"
-        assert r["계약구분"] == "다수공급자계약"      # MAS vs 3자단가 구분의 근거
-        assert r["계약번호"] == "001880931_1"          # 계약 건 구분
-        assert r["최종계약여부"] == "Y"
-        assert r["세부품명"] == "안내판걸이구"
-        assert r["세부품명번호"] == "5512190801"
-        assert r["제조업체"] == "주식회사김스애드"
-
-
-    def test_price_coercion(self):
-        assert g2b._normalize({"ctrtUprc": "17990.0"})["계약단가"] == 17990
-        assert g2b._normalize({"ctrtUprc": None})["계약단가"] == 0
-        assert g2b._normalize({})["계약단가"] == 0
+    def test_captured_row_maps_to_comparison_fields(self):
+        page = parse_search_page({"totalSize": 12455, "rsltList": [SAMPLE]}, get_profile())
+        item = extract(page.rows[0].raw)
+        self.assertEqual(page.rows[0].contract_price_decimal, Decimal(17990))
+        self.assertEqual((item["가격"], item["계약구분"], item["세부품명"], item["세부품명번호"],
+                          item["업체"], item["식별번호"]),
+                         (Decimal(17990), "다수공급자계약", "안내판걸이구", "5512190801",
+                          "주식회사김스애드", "22757231"))
 
 
 if __name__ == "__main__":
