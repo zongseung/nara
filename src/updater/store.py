@@ -1,7 +1,7 @@
 """Control database and fenced single-writer lifecycle."""
 from contextlib import contextmanager, closing, AbstractContextManager
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import os
 from pathlib import Path
 import sqlite3
@@ -28,7 +28,6 @@ class Lease:
     previous_run_id: str | None
     profile: SourceProfile
     environment: Literal['fixture','production'] = 'production'
-    slot_key: str | None = None
 
 
 def utc_now() -> str:
@@ -140,7 +139,7 @@ class Store:
             raise StoreError('cancelled')
 
     @contextmanager
-    def writer(self, profile: SourceProfile, *, environment: Literal['fixture','production'] = 'production', resume_run_id: str | None = None) -> Iterator[Lease]:
+    def writer(self, profile: SourceProfile, *, environment: Literal['fixture','production'] = 'production') -> Iterator[Lease]:
         profile.require_collection_ready()
         try:
             with file_lock(self.path(f'locks/writer-{profile.profile_hash}.lock'), blocking=False):
@@ -152,21 +151,12 @@ class Store:
                     row = conn.execute('SELECT fence FROM writer_leases WHERE profile_hash=?',
                                        (profile.profile_hash,)).fetchone()
                     parent_id = None if previous is None else previous[0]
-                    if resume_run_id is not None:
-                        prior = conn.execute('SELECT * FROM runs WHERE run_id=?',(resume_run_id,)).fetchone()
-                        if prior is None or prior['profile_hash'] != profile.profile_hash or prior['environment'] != environment or prior['status'] == 'published' or prior['previous_run_id'] != parent_id:
-                            raise StoreError('incompatible_resume')
-                        if datetime.now(timezone.utc)-datetime.fromisoformat(prior['started_at']) > timedelta(hours=12):
-                            raise StoreError('expired_resume')
-                    lease = Lease(resume_run_id or uuid4().hex, uuid4().hex, 1 if row is None else row[0] + 1,
+                    lease = Lease(uuid4().hex, uuid4().hex, 1 if row is None else row[0] + 1,
                                   None if previous is None else previous[0], profile, environment)
                     conn.execute('INSERT INTO writer_leases VALUES (?,?,?,?) ON CONFLICT(profile_hash) DO UPDATE SET owner=excluded.owner,fence=excluded.fence,heartbeat=excluded.heartbeat',
                                  (profile.profile_hash, lease.owner, lease.fence, utc_now()))
-                    if resume_run_id is None:
-                        conn.execute('INSERT INTO runs(run_id,profile_hash,status,started_at,environment,previous_run_id) VALUES (?,?,?,?,?,?)',
-                                     (lease.run_id,profile.profile_hash,'collecting',utc_now(),environment,parent_id))
-                    else:
-                        conn.execute("UPDATE runs SET status='collecting',finished_at=NULL,cancelled=0 WHERE run_id=?",(lease.run_id,))
+                    conn.execute('INSERT INTO runs(run_id,profile_hash,status,started_at,environment,previous_run_id) VALUES (?,?,?,?,?,?)',
+                                 (lease.run_id,profile.profile_hash,'collecting',utc_now(),environment,parent_id))
                 with self.stage(lease) as conn:
                     conn.executescript(STAGE_SCHEMA)
                 try:

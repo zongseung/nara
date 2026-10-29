@@ -15,18 +15,10 @@ from core.catalog_sources import get_profile
 
 def enter_maintenance(store: Store) -> None:
     store.path('control/maintenance.flag').write_text(utc_now())
-    if os.environ.get('PREFECT_API_URL'):
-        from prefect.client.orchestration import get_client
-        from src.updater.dispatcher import DEPLOYMENT_NAME
-        with get_client(sync_client=True) as client:
-            deployment=client.read_deployment_by_name(DEPLOYMENT_NAME)
-            client.pause_deployment(deployment.id)
-            for schedule in deployment.schedules:
-                client.update_deployment_schedule(deployment.id,schedule.id,active=False)
 
 
 def resume(store: Store) -> None:
-    """Operator action after source and matching restore validation; schedules stay inactive."""
+    """Operator action after source and matching restore validation."""
     manifest=catalog_manifest(store)
     with open_published_snapshot(manifest,root=store.root) as snapshot:
         if snapshot.connection.execute('PRAGMA integrity_check').fetchone()[0]!='ok' or snapshot.connection.execute('PRAGMA foreign_key_check').fetchall():
@@ -181,7 +173,7 @@ def prune_files(store: Store, *, now: datetime | None = None) -> dict[str,list[s
 
 
 def prune_history(store: Store, *, now: datetime | None = None) -> Manifest:
-    """Publish a maintenance generation; source observations and scheduled success stay fixed."""
+    """Publish a maintenance generation; source observations stay fixed."""
     cutoff=((now or datetime.now(timezone.utc))-timedelta(days=365)).isoformat()
     enter_maintenance(store)
     with file_lock(store.path('locks/maintenance.lock')):
