@@ -6,7 +6,7 @@
 
 ## 설치 계정과 의존성
 
-기본 `requirements.txt`는 기존 추천/변환에 사용합니다. CPU 매칭은 별도 환경에서 `pip install -r requirements-matching.in`을 설치합니다. `python -m src.matching.cli --help`는 CPU 모델을 로드하지 않습니다. Prefect는 updater 운영 환경의 선택 의존성입니다.
+기본 `requirements.txt`는 기존 추천/변환에 사용합니다. CPU 매칭은 별도 환경에서 `pip install -r requirements-matching.in`을 설치합니다. `python -m src.matching.cli --help`는 CPU 모델을 로드하지 않습니다.
 
 관리자가 보호된 실행 환경에 `NARA_MATCHING_CONFIG=/etc/nara/matching.json`을 설정합니다. 직원이 환경변수/설정/실행 계정을 바꿀 수 있는 일반 셸을 권한 경계로 사용하지 마십시오. 직원에게는 신뢰된 launcher의 run/status/read만 제공하고 운영 명령은 운영 계정으로 실행합니다. 설정은 root 또는 설치 실행 계정 소유이고 group/world writable이 아니어야 합니다. 실제 OS UID가 roles_by_uid에 매핑됩니다. XLSX reviewer나 CLI role 문자열로 권한을 얻을 수 없습니다.
 
